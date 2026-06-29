@@ -1,0 +1,222 @@
+(function () {
+  "use strict";
+
+  const Api = window.Y2kApi;
+  const Utils = window.Y2kUtils;
+  let currentIdentity = null;
+  let currentState = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function showMessage(text, type) {
+    const box = $("message");
+    box.textContent = text;
+    box.className = `message ${type || ""}`.trim();
+    box.classList.toggle("hidden", !text);
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function memberId() {
+    return currentState && currentState.member && currentState.member.memberId;
+  }
+
+  function findRegistration(eventId) {
+    return (currentState.registrations || []).find((item) => item.memberId === memberId() && item.eventId === eventId);
+  }
+
+  function findAttendance(eventId) {
+    return (currentState.attendance || []).find((item) => item.memberId === memberId() && item.eventId === eventId && item.status === "已簽到");
+  }
+
+  async function ensureIdentity() {
+    currentIdentity = await Api.getLineIdentity();
+    if (currentIdentity && currentIdentity.displayName) {
+      $("lineDisplayName").value = currentIdentity.displayName;
+    }
+    return currentIdentity;
+  }
+
+  async function renderMemberState() {
+    const identity = await ensureIdentity();
+    if (!identity || !identity.lineUserId) {
+      $("bindingPanel").classList.add("hidden");
+      $("memberHome").classList.add("hidden");
+      showMessage("尚未取得 LINE 身分，請從 LINE 入口開啟本系統。", "error");
+      return;
+    }
+
+    currentState = await Api.memberHome(identity.lineUserId);
+    $("bindingPanel").classList.toggle("hidden", Boolean(currentState.bound));
+    $("memberHome").classList.toggle("hidden", !currentState.bound);
+
+    if (!currentState.bound) {
+      showMessage("此 LINE 帳號尚未綁定會員，請先用手機認證。", "");
+      return;
+    }
+
+    const member = currentState.member;
+    showMessage("", "");
+    $("memberGreeting").textContent = `${member.name}，您好`;
+    $("memberMeta").textContent = `會員編號 ${member.memberId}｜${member.status}｜手機 ${member.phoneMasked || Utils.maskPhone(member.phone)}`;
+    renderEvents();
+    renderRecords();
+    renderProfile();
+  }
+
+  function renderEvents() {
+    const events = (currentState.events || [])
+      .filter((event) => event.status === "開放")
+      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+
+    $("eventList").innerHTML = events.map((event) => {
+      const registration = findRegistration(event.eventId);
+      const attendance = findAttendance(event.eventId);
+      const registered = registration && registration.status === "已報名";
+      const canceled = registration && registration.status === "已取消";
+      return `
+        <article class="item">
+          <div class="item-row">
+            <div>
+              <h3>${escapeHtml(event.name)}</h3>
+              <div class="meta">
+                <span>${escapeHtml(Utils.formatEventDate(event))}</span>
+                <span>${escapeHtml(event.location || "未填地點")}</span>
+              </div>
+            </div>
+            <span class="badge ${attendance ? "green" : registered ? "yellow" : ""}">
+              ${attendance ? "已簽到" : registered ? "已報名" : canceled ? "已取消" : "尚未報名"}
+            </span>
+          </div>
+          <p class="muted">${escapeHtml(event.notes || "")}</p>
+          ${registered ? `<p class="hint">同行人數：${Number(registration.companions || 0)}｜備註：${escapeHtml(registration.notes || "無")}</p>` : ""}
+          <div class="button-row">
+            ${event.registrationOpen && !registered ? `<button data-action="register" data-event="${escapeHtml(event.eventId)}" type="button">我要報名</button>` : ""}
+            ${event.registrationOpen && registered ? `<button class="secondary" data-action="cancel-registration" data-event="${escapeHtml(event.eventId)}" type="button">取消報名</button>` : ""}
+            ${event.checkinOpen && !attendance ? `<button data-action="checkin" data-event="${escapeHtml(event.eventId)}" type="button">我要簽到</button>` : ""}
+            ${attendance ? `<span class="badge green">簽到時間 ${Utils.displayDateTime(attendance.checkedInAt)}</span>` : ""}
+          </div>
+        </article>
+      `;
+    }).join("") || `<section class="panel"><p class="muted">目前沒有開放活動。</p></section>`;
+  }
+
+  function renderRecords() {
+    const records = [];
+    (currentState.registrations || []).forEach((item) => {
+      const event = (currentState.events || []).find((eventItem) => eventItem.eventId === item.eventId);
+      records.push({
+        time: item.canceledAt || item.registeredAt,
+        title: `${event ? event.name : item.eventId}｜${item.status}`,
+        detail: `報名時間 ${Utils.displayDateTime(item.registeredAt)}${item.canceledAt ? `｜取消 ${Utils.displayDateTime(item.canceledAt)}` : ""}`
+      });
+    });
+    (currentState.attendance || []).forEach((item) => {
+      const event = (currentState.events || []).find((eventItem) => eventItem.eventId === item.eventId);
+      records.push({
+        time: item.checkedInAt,
+        title: `${event ? event.name : item.eventId}｜${item.status}`,
+        detail: `簽到時間 ${Utils.displayDateTime(item.checkedInAt)}｜方式 ${item.method}`
+      });
+    });
+    records.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+    $("recordList").innerHTML = records.map((record) => `
+      <article class="item">
+        <h3>${escapeHtml(record.title)}</h3>
+        <p class="muted">${escapeHtml(record.detail)}</p>
+      </article>
+    `).join("") || `<p class="muted">目前尚無紀錄。</p>`;
+  }
+
+  function renderProfile() {
+    const member = currentState.member;
+    const rows = [
+      ["姓名", member.name],
+      ["會員編號", member.memberId],
+      ["手機", member.phoneMasked || Utils.maskPhone(member.phone)],
+      ["會員狀態", member.status],
+      ["生日", member.birthday || "未填"],
+      ["LINE 綁定", member.lineBound || member.lineUserId ? "已綁定" : "未綁定"],
+      ["綁定時間", Utils.displayDateTime(member.boundAt) || "未綁定"]
+    ];
+    $("profileDetails").innerHTML = rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("");
+  }
+
+  async function bindMember() {
+    try {
+      const identity = currentIdentity || await ensureIdentity();
+      if (!identity || !identity.lineUserId) throw new Error("尚未取得 LINE 身分");
+      currentState = await Api.bindMember(identity.lineUserId, $("lineDisplayName").value.trim(), $("phoneInput").value.trim());
+      showMessage(`已成功綁定 ${currentState.member.name}。`, "success");
+      $("phoneInput").value = "";
+      await renderMemberState();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  }
+
+  async function promptRegistration(eventId) {
+    const companions = prompt("同行人數？", "0");
+    if (companions == null) return;
+    const notes = prompt("備註？可空白", "") || "";
+    try {
+      currentState = await Api.registerEvent(currentIdentity.lineUserId, eventId, Number(companions || 0), notes);
+      showMessage("報名完成。", "success");
+      await renderMemberState();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  }
+
+  async function cancelRegistration(eventId) {
+    if (!confirm("確定取消這場活動報名？")) return;
+    try {
+      currentState = await Api.cancelRegistration(currentIdentity.lineUserId, eventId);
+      showMessage("已取消報名。", "success");
+      await renderMemberState();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  }
+
+  async function checkIn(eventId) {
+    try {
+      currentState = await Api.checkIn(currentIdentity.lineUserId, eventId);
+      showMessage("簽到完成。", "success");
+      await renderMemberState();
+    } catch (error) {
+      showMessage(error.message, "error");
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    const eventId = button.dataset.event;
+    if (action === "register") promptRegistration(eventId);
+    if (action === "cancel-registration") cancelRegistration(eventId);
+    if (action === "checkin") checkIn(eventId);
+  });
+
+  document.addEventListener("click", (event) => {
+    const tab = event.target.closest(".tab");
+    if (!tab) return;
+    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((panel) => panel.classList.add("hidden"));
+    tab.classList.add("active");
+    $(`${tab.dataset.tab}Tab`).classList.remove("hidden");
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    $("bindButton").addEventListener("click", bindMember);
+    renderMemberState().catch((error) => showMessage(error.message, "error"));
+  });
+})();

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#255653">
+  <title>千禧管理後台</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js" defer></script>
+  <script src="utils.js" defer></script>
+  <script src="api.js" defer></script>
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <header class="app-header compact">
+    <div class="brand-mark">管</div>
+    <div>
+      <p class="eyebrow">Admin Console</p>
+      <h1>千禧管理後台</h1>
+      <p>會員、活動、報名、簽到與資料匯出。</p>
+    </div>
+  </header>
+
+  <main class="shell wide">
+    <section id="loginPanel" class="panel login-card">
+      <h2>後台登入</h2>
+      <div class="form-grid two">
+        <label>帳號
+          <input id="username" autocomplete="username">
+        </label>
+        <label>密碼
+          <input id="password" type="password" autocomplete="current-password">
+        </label>
+      </div>
+      <button id="loginButton" type="button">登入</button>
+      <p id="loginMessage" class="message hidden"></p>
+    </section>
+
+    <section id="adminApp" class="hidden">
+      <section class="panel admin-bar">
+        <div>
+          <p class="eyebrow">Signed in</p>
+          <h2 id="adminName">管理員</h2>
+          <p id="adminRole" class="muted"></p>
+          <p id="apiStatus" class="connection-status"></p>
+        </div>
+        <div class="actions">
+          <a class="button secondary" href="index.html">會員端</a>
+          <button id="apiHealthButton" class="secondary" type="button">檢查連線</button>
+          <button id="changePasswordButton" class="secondary" type="button">變更密碼</button>
+          <button id="logoutButton" type="button">登出</button>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article><span>會員總數</span><strong id="statMembers">0</strong></article>
+        <article><span>已綁定 LINE</span><strong id="statBound">0</strong></article>
+        <article><span>開放活動</span><strong id="statEvents">0</strong></article>
+        <article><span>有效報名</span><strong id="statRegs">0</strong></article>
+        <article><span>已簽到</span><strong id="statCheckins">0</strong></article>
+      </section>
+
+      <nav class="tabs admin-tabs">
+        <button class="tab active" data-tab="dashboard" type="button">總覽</button>
+        <button class="tab" data-tab="members" type="button">會員管理</button>
+        <button class="tab" data-tab="events" type="button">活動管理</button>
+        <button class="tab" data-tab="registrations" type="button">報名管理</button>
+        <button class="tab" data-tab="attendance" type="button">簽到管理</button>
+        <button class="tab" data-tab="logs" type="button">操作紀錄</button>
+      </nav>
+
+      <section id="dashboardTab" class="tab-panel">
+        <section class="panel">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2>目前活動總覽</h2>
+            </div>
+            <button id="exportAllButton" class="secondary" type="button">匯出資料 JSON</button>
+          </div>
+          <div id="dashboardList" class="list"></div>
+        </section>
+      </section>
+
+      <section id="membersTab" class="tab-panel hidden">
+        <section class="panel">
+          <h2>新增 / 編輯會員</h2>
+          <div class="form-grid five">
+            <label>會員編號<input id="memberIdInput" placeholder="M005"></label>
+            <label>姓名<input id="memberNameInput" placeholder="姓名"></label>
+            <label>手機<input id="memberPhoneInput" placeholder="0912345678"></label>
+            <label>會員狀態
+              <select id="memberStatusInput">
+                <option>有效</option>
+                <option>停用</option>
+                <option>離會</option>
+              </select>
+            </label>
+            <label>生日<input id="memberBirthdayInput" placeholder="1965/01/01"></label>
+          </div>
+          <button id="saveMemberButton" type="button">儲存會員</button>
+        </section>
+        <section class="panel">
+          <div class="section-title">
+            <div><h2>會員清單</h2><p class="muted">可查看 LINE 綁定狀態，系統管理員可解除綁定。</p></div>
+            <input id="memberSearch" class="search" placeholder="搜尋姓名、手機、編號">
+          </div>
+          <div id="memberList" class="list"></div>
+        </section>
+      </section>
+
+      <section id="eventsTab" class="tab-panel hidden">
+        <section class="panel">
+          <h2>新增 / 編輯活動</h2>
+          <input id="eventIdInput" type="hidden">
+          <div class="form-grid four">
+            <label>活動名稱<input id="eventNameInput" placeholder="例會"></label>
+            <label>活動日期<input id="eventDateInput" type="date"></label>
+            <label>開始時間<input id="eventStartInput" type="time"></label>
+            <label>結束時間<input id="eventEndInput" type="time"></label>
+            <label>活動地點<input id="eventLocationInput" placeholder="地點"></label>
+            <label>活動狀態
+              <select id="eventStatusInput">
+                <option>草稿</option>
+                <option selected>開放</option>
+                <option>結束</option>
+                <option>取消</option>
+              </select>
+            </label>
+            <label class="checkline"><input id="eventRegInput" type="checkbox" checked> 開放報名</label>
+            <label class="checkline"><input id="eventCheckinInput" type="checkbox" checked> 開放簽到</label>
+          </div>
+          <label>備註<textarea id="eventNotesInput" rows="3"></textarea></label>
+          <button id="saveEventButton" type="button">儲存活動</button>
+        </section>
+        <section class="panel">
+          <h2>活動清單</h2>
+          <div id="eventAdminList" class="list"></div>
+        </section>
+      </section>
+
+      <section id="registrationsTab" class="tab-panel hidden">
+        <section class="panel">
+          <div class="section-title">
+            <div><h2>報名名單</h2><p class="muted">顯示已報名、已取消與同行人數。</p></div>
+            <select id="registrationEventFilter"></select>
+          </div>
+          <div id="registrationList" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="attendanceTab" class="tab-panel hidden">
+        <section class="panel">
+          <h2>後台補簽到</h2>
+          <div class="form-grid three">
+            <label>活動<select id="manualEventSelect"></select></label>
+            <label>會員<select id="manualMemberSelect"></select></label>
+            <label>備註<input id="manualNotesInput" placeholder="例如：現場確認出席"></label>
+          </div>
+          <button id="manualCheckinButton" type="button">後台補簽到</button>
+        </section>
+        <section class="panel">
+          <div class="section-title">
+            <div><h2>簽到名單與比對</h2><p class="muted">可看已報名未簽到、未報名已簽到。</p></div>
+            <select id="attendanceEventFilter"></select>
+          </div>
+          <div id="attendanceCompare" class="compare-grid"></div>
+          <div id="attendanceList" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="logsTab" class="tab-panel hidden">
+        <section class="panel">
+          <h2>最近操作紀錄</h2>
+          <div id="logList" class="table-wrap"></div>
+        </section>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

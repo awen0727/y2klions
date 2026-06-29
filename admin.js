@@ -85,10 +85,22 @@
     return data.attendance.filter((item) => item.eventId === eventId && item.status === "已簽到").length;
   }
 
+  function isCountedMember(member) {
+    if (member.countInMemberStats === false || member.isSystemAdminMember) return false;
+    return member.memberId !== "M000" && member.status !== "系統管理員";
+  }
+
+  function memberStatusBadgeClass(status) {
+    if (status === "有效") return "green";
+    if (status === "系統管理員") return "yellow";
+    return "red";
+  }
+
   function renderStats() {
     const data = db();
-    $("statMembers").textContent = data.members.length;
-    $("statBound").textContent = data.members.filter((member) => member.lineUserId || member.lineBound).length;
+    const countedMembers = data.members.filter(isCountedMember);
+    $("statMembers").textContent = countedMembers.length;
+    $("statBound").textContent = countedMembers.filter((member) => member.lineUserId || member.lineBound).length;
     $("statEvents").textContent = data.events.filter((event) => event.status === "開放").length;
     $("statRegs").textContent = data.registrations.filter((item) => item.status === "已報名").length;
     $("statCheckins").textContent = data.attendance.filter((item) => item.status === "已簽到").length;
@@ -146,7 +158,7 @@
                 <span>${escapeHtml(member.birthday || "未填生日")}</span>
               </div>
             </div>
-            <span class="badge ${member.status === "有效" ? "green" : "red"}">${escapeHtml(member.status)}</span>
+            <span class="badge ${memberStatusBadgeClass(member.status)}">${escapeHtml(member.status)}</span>
           </div>
           <div class="meta">
             <span>LINE：${bound ? `已綁定 (${escapeHtml(member.lineDisplayName || member.lineUserId || "LINE")})` : "未綁定"}</span>

@@ -510,15 +510,20 @@ function normalizeCell_(value) {
 }
 
 function publicMember_(row) {
+  const memberId = String(row['會員編號'] || '');
+  const status = String(row['會員狀態'] || '');
+  const countInMemberStats = memberId !== 'M000' && status !== '系統管理員';
   return {
-    memberId: row['會員編號'],
+    memberId: memberId,
     name: row['姓名'],
     phoneMasked: maskPhone_(row['手機']),
-    status: row['會員狀態'],
+    status: status,
     birthday: row['生日'],
     lineBound: Boolean(row['LINE User ID']),
     boundAt: row['綁定時間'] || '',
-    lastLoginAt: row['最後登入時間'] || ''
+    lastLoginAt: row['最後登入時間'] || '',
+    countInMemberStats: countInMemberStats,
+    isSystemAdminMember: !countInMemberStats
   };
 }
 

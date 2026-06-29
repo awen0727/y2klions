@@ -115,6 +115,45 @@ function setupY2kDatabase() {
   setupY2kSheets_(ss);
   createSetupGuideSheet_(ss);
   seedProductionSettings_();
+  ensureY2kSystemAdminMember();
+  SpreadsheetApp.flush();
+}
+
+function ensureY2kSystemAdminMember() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Members');
+  if (!sheet) throw new Error('請先執行 setupY2kDatabase');
+
+  const now = nowIso_();
+  const member = {
+    '會員編號': 'M000',
+    '姓名': '王立文',
+    '手機': '0932368727',
+    '會員狀態': '系統管理員',
+    '生日': '',
+    '更新時間': now
+  };
+  const existing = findRowByValue_('Members', '會員編號', member['會員編號']);
+  if (existing) {
+    updateByKey_('Members', '會員編號', member['會員編號'], member);
+    audit_('setup', '更新系統管理員會員', '會員', member['會員編號'], member['姓名']);
+    SpreadsheetApp.flush();
+    return;
+  }
+
+  appendRow_('Members', [
+    member['會員編號'],
+    member['姓名'],
+    member['手機'],
+    member['會員狀態'],
+    member['生日'],
+    '',
+    '',
+    '',
+    '',
+    now,
+    now
+  ]);
+  audit_('setup', '建立系統管理員會員', '會員', member['會員編號'], member['姓名']);
   SpreadsheetApp.flush();
 }
 
@@ -176,10 +215,11 @@ function createSetupGuideSheet_(ss) {
   const rows = [
     ['千禧獅子會系統建置步驟', ''],
     ['1', '執行「千禧獅子會系統 > 建立正式資料庫」。'],
-    ['2', '在 Apps Script 手動執行 createY2kAdminUser(username, password, name, role) 建立第一個系統管理員。'],
-    ['3', '執行「建立會員匯入表」，到 MembersImport 填入會員編號、姓名、手機、會員狀態、生日。'],
-    ['4', '執行「匯入會員資料」，系統會新增或更新 Members。'],
-    ['5', '部署 Apps Script Web App，取得 URL 後填入前端 config.js。'],
+    ['2', '系統會預設建立 M000 王立文，會員狀態為「系統管理員」，不計入會員總數。'],
+    ['3', '在 Apps Script 手動執行 createY2kAdminUser(username, password, name, role) 建立第一個後台登入帳號。'],
+    ['4', '執行「建立會員匯入表」，到 MembersImport 填入會員編號、姓名、手機、會員狀態、生日。'],
+    ['5', '執行「匯入會員資料」，系統會新增或更新 Members。'],
+    ['6', '部署 Apps Script Web App，取得 URL 後填入前端 config.js。'],
     ['安全提醒', 'GitHub Pages 只能放前端，不能放會員資料、密碼、Token 或 Google Sheet ID。']
   ];
   sheet.getRange(1, 1, rows.length, 2).setValues(rows);

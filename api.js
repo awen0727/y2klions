@@ -157,6 +157,11 @@
     return adminDashboard();
   }
 
+  async function deleteEvent(eventId, force) {
+    await post({ action: "deleteEvent", sessionToken: getSessionToken(), eventId, force: Boolean(force) });
+    return adminDashboard();
+  }
+
   async function manualCheckIn(eventId, memberId, notes) {
     await post({ action: "manualCheckIn", sessionToken: getSessionToken(), eventId, memberId, notes: notes || "" });
     return adminDashboard();
@@ -185,6 +190,7 @@
     saveMember,
     unbindMember,
     saveEvent,
+    deleteEvent,
     manualCheckIn,
     cancelCheckIn
   };

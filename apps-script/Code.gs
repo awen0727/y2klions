@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-30-v3';
+const API_VERSION = 'y2k-2026-06-30-v4';
 
 function doGet() {
   return json_({
@@ -57,6 +57,8 @@ function route_(action, payload) {
       return unbindMember_(requireAdminRole_(payload.sessionToken, '系統管理員'), payload.memberId);
     case 'saveEvent':
       return saveEvent_(requireAdmin_(payload.sessionToken), payload.event);
+    case 'deleteEvent':
+      return deleteEvent_(requireAdmin_(payload.sessionToken), payload.eventId, payload.force);
     case 'manualCheckIn':
       return manualCheckIn_(requireAdmin_(payload.sessionToken), payload);
     case 'cancelCheckIn':
@@ -417,6 +419,30 @@ function saveEvent_(session, event) {
   return { eventId: eventId };
 }
 
+function deleteEvent_(session, eventId, force) {
+  touchSession_(session.sessionId);
+  eventId = required_(eventId, '缺少活動編號');
+  const event = findRowByValue_('Events', '活動編號', eventId);
+  if (!event) throw new Error('找不到活動');
+
+  const registrationCount = rows_('EventRegistrations').filter((row) => row['活動編號'] === eventId).length;
+  const attendanceCount = rows_('Attendance').filter((row) => row['活動編號'] === eventId).length;
+  if ((registrationCount || attendanceCount) && !force) {
+    throw new Error('此活動已有報名或簽到紀錄，請再次確認後刪除');
+  }
+
+  const deletedRegistrations = deleteRowsByValue_('EventRegistrations', '活動編號', eventId);
+  const deletedAttendance = deleteRowsByValue_('Attendance', '活動編號', eventId);
+  const deletedEvents = deleteRowsByValue_('Events', '活動編號', eventId);
+  audit_(session.name, '刪除活動', '活動', eventId, event['活動名稱'] + ' / 報名 ' + deletedRegistrations + ' / 簽到 ' + deletedAttendance);
+  return {
+    eventId: eventId,
+    deletedEvents: deletedEvents,
+    deletedRegistrations: deletedRegistrations,
+    deletedAttendance: deletedAttendance
+  };
+}
+
 function manualCheckIn_(session, payload) {
   const member = findRowByValue_('Members', '會員編號', required_(payload.memberId, '缺少會員編號'));
   if (!member) throw new Error('找不到會員');
@@ -605,6 +631,24 @@ function updateByKey_(sheetName, key, keyValue, updates) {
     }
   }
   throw new Error('找不到資料：' + keyValue);
+}
+
+function deleteRowsByValue_(sheetName, key, value) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('找不到工作表：' + sheetName);
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 2) return 0;
+  const headers = values[0];
+  const keyIndex = headers.indexOf(key);
+  if (keyIndex === -1) throw new Error('找不到欄位：' + key);
+  let deleted = 0;
+  for (let rowIndex = values.length - 1; rowIndex >= 1; rowIndex--) {
+    if (String(values[rowIndex][keyIndex]) === String(value)) {
+      sheet.deleteRow(rowIndex + 1);
+      deleted += 1;
+    }
+  }
+  return deleted;
 }
 
 function ensureSheetColumns_(sheetName, columns) {

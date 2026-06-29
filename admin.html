@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#163f73">
   <title>千禧管理後台</title>
   <link rel="icon" href="assets/y2k-logo.png?v=20260629-visual3">
-  <link rel="stylesheet" href="styles.css?v=20260630-admin-report">
+  <link rel="stylesheet" href="styles.css?v=20260630-admin-tools">
   <script src="config.js?v=20260630-api3" defer></script>
-  <script src="utils.js?v=20260630-admin-report" defer></script>
-  <script src="api.js?v=20260630-admin-report" defer></script>
-  <script src="admin.js?v=20260630-admin-report" defer></script>
+  <script src="utils.js?v=20260630-admin-tools" defer></script>
+  <script src="api.js?v=20260630-admin-tools" defer></script>
+  <script src="admin.js?v=20260630-admin-tools" defer></script>
 </head>
 <body>
   <header class="app-header compact">
@@ -106,9 +106,24 @@
         <section class="panel">
           <div class="section-title">
             <div><h2>會員清單</h2><p class="muted">可查看 LINE 綁定狀態，系統管理員可解除綁定。</p></div>
-            <input id="memberSearch" class="search" placeholder="搜尋姓名、手機、編號">
+            <div class="toolbar">
+              <input id="memberSearch" class="search" placeholder="搜尋姓名、手機、編號">
+              <button id="exportMembersButton" class="secondary" type="button"><span class="icon">⇩</span>匯出 Excel</button>
+            </div>
           </div>
           <div id="memberList" class="list"></div>
+        </section>
+        <section id="memberAttendancePanel" class="panel hidden">
+          <div class="section-title">
+            <div>
+              <p class="eyebrow">Member Attendance</p>
+              <h2 id="memberAttendanceTitle">個人出席狀況</h2>
+              <p id="memberAttendanceMeta" class="muted"></p>
+            </div>
+            <button id="closeMemberAttendanceButton" class="secondary" type="button">關閉</button>
+          </div>
+          <div id="memberAttendanceSummary" class="compare-grid"></div>
+          <div id="memberAttendanceList" class="table-wrap"></div>
         </section>
       </section>
 

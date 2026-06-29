@@ -116,6 +116,17 @@
     return url.toString();
   }
 
+  function downloadExcel(filename, tableHtml) {
+    const content = `<html><head><meta charset="utf-8"></head><body>${tableHtml}</body></html>`;
+    const blob = new Blob(["\ufeff", content], { type: "application/vnd.ms-excel;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename.replace(/[\\/:*?"<>|]/g, "-");
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function renderStats() {
     const data = db();
     const countedMembers = data.members.filter(isCountedMember);
@@ -187,6 +198,7 @@
           </div>
           <div class="button-row">
             <button class="secondary small" data-action="edit-member" data-member="${escapeHtml(member.memberId)}" type="button">編輯</button>
+            <button class="secondary small" data-action="member-attendance" data-member="${escapeHtml(member.memberId)}" type="button">出席紀錄</button>
             ${canUnbind ? `<button class="danger small" data-action="unbind-member" data-member="${escapeHtml(member.memberId)}" type="button">解除 LINE 綁定</button>` : ""}
           </div>
         </article>
@@ -218,6 +230,7 @@
           <button class="secondary small" data-action="edit-event" data-event="${escapeHtml(event.eventId)}" type="button">編輯</button>
           <button class="secondary small" data-action="open-display" data-event="${escapeHtml(event.eventId)}" type="button">即時看板</button>
           <button class="secondary small" data-action="export-event" data-event="${escapeHtml(event.eventId)}" type="button">匯出 Excel</button>
+          <button class="danger small" data-action="delete-event" data-event="${escapeHtml(event.eventId)}" type="button">刪除</button>
         </div>
       </article>
     `).join("") || `<p class="muted">尚未建立活動。</p>`;
@@ -329,6 +342,64 @@
         statusKey: checked ? (registered ? "checked" : "walkin") : (registered ? "registered-unchecked" : "absent")
       };
     });
+  }
+
+  function memberAttendanceRows(memberId) {
+    const data = db();
+    const memberRegs = data.registrations.filter((item) => item.memberId === memberId);
+    const memberAttendance = data.attendance.filter((item) => item.memberId === memberId);
+    const ids = new Set([
+      ...memberRegs.map((item) => item.eventId),
+      ...memberAttendance.map((item) => item.eventId)
+    ]);
+    return Array.from(ids).map((eventId) => {
+      const event = eventById(eventId);
+      const registration = memberRegs.find((item) => item.eventId === eventId) || null;
+      const attendance = memberAttendance.find((item) => item.eventId === eventId && item.status === "已簽到") || null;
+      return {
+        eventId,
+        event,
+        registration,
+        attendance,
+        time: attendance?.checkedInAt || registration?.registeredAt || (event && event.date) || ""
+      };
+    }).sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  }
+
+  function renderMemberAttendance(memberId) {
+    const member = memberById(memberId);
+    if (!member) return;
+    const rows = memberAttendanceRows(memberId);
+    const registered = rows.filter((row) => row.registration && row.registration.status === "已報名").length;
+    const checked = rows.filter((row) => row.attendance).length;
+    const canceled = rows.filter((row) => row.registration && row.registration.status === "已取消").length;
+    $("memberAttendanceTitle").textContent = `${member.name} 出席狀況`;
+    $("memberAttendanceMeta").textContent = `${member.memberId}｜${member.annualRole || "未設定職位"}｜${member.phoneMasked || Utils.maskPhone(member.phone)}`;
+    $("memberAttendanceSummary").innerHTML = `
+      <article class="compare-card"><span>有紀錄活動</span><strong>${rows.length}</strong></article>
+      <article class="compare-card"><span>有效報名</span><strong>${registered}</strong></article>
+      <article class="compare-card"><span>已簽到</span><strong>${checked}</strong></article>
+      <article class="compare-card"><span>取消報名</span><strong>${canceled}</strong></article>
+    `;
+    $("memberAttendanceList").innerHTML = `
+      <table>
+        <thead><tr><th>活動</th><th>日期時間</th><th>地點</th><th>報名</th><th>同行</th><th>簽到</th><th>簽到時間</th><th>方式</th></tr></thead>
+        <tbody>${rows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.event ? row.event.name : row.eventId)}</td>
+            <td>${escapeHtml(row.event ? Utils.formatEventDate(row.event) : "")}</td>
+            <td>${escapeHtml(row.event?.location || "")}</td>
+            <td>${escapeHtml(row.registration?.status || "未報名")}</td>
+            <td>${Number(row.registration?.companions || 0)}</td>
+            <td>${row.attendance ? "已簽到" : "未簽到"}</td>
+            <td>${Utils.displayDateTime(row.attendance?.checkedInAt) || ""}</td>
+            <td>${escapeHtml(row.attendance?.method || "")}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="8">此會員目前沒有活動紀錄。</td></tr>`}</tbody>
+      </table>
+    `;
+    $("memberAttendancePanel").classList.remove("hidden");
+    $("memberAttendancePanel").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function renderReports() {
@@ -518,21 +589,35 @@
         <td>${escapeHtml(row.attendance?.notes || "")}</td>
       </tr>
     `).join("");
-    const content = `
-      <html><head><meta charset="utf-8"></head><body>
-        <table border="1">
-          <thead><tr><th>活動編號</th><th>活動名稱</th><th>活動時間</th><th>會員編號</th><th>姓名</th><th>年度職位</th><th>手機</th><th>報名狀態</th><th>同行</th><th>報名備註</th><th>簽到狀態</th><th>簽到時間</th><th>方式</th><th>簽到備註</th></tr></thead>
-          <tbody>${tableRows || `<tr><td colspan="14">無資料</td></tr>`}</tbody>
-        </table>
-      </body></html>
-    `;
-    const blob = new Blob(["\ufeff", content], { type: "application/vnd.ms-excel;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${event.eventId}-${event.name || "活動"}-出席報表.xls`.replace(/[\\/:*?"<>|]/g, "-");
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadExcel(`${event.eventId}-${event.name || "活動"}-出席報表.xls`, `
+      <table border="1">
+        <thead><tr><th>活動編號</th><th>活動名稱</th><th>活動時間</th><th>會員編號</th><th>姓名</th><th>年度職位</th><th>手機</th><th>報名狀態</th><th>同行</th><th>報名備註</th><th>簽到狀態</th><th>簽到時間</th><th>方式</th><th>簽到備註</th></tr></thead>
+        <tbody>${tableRows || `<tr><td colspan="14">無資料</td></tr>`}</tbody>
+      </table>
+    `);
+  }
+
+  function exportMembersExcel() {
+    const rows = db().members.map((member) => `
+      <tr>
+        <td>${escapeHtml(member.memberId)}</td>
+        <td>${escapeHtml(member.name)}</td>
+        <td>${escapeHtml(member.phone || "")}</td>
+        <td>${escapeHtml(member.status || "")}</td>
+        <td>${escapeHtml(member.annualRole || "")}</td>
+        <td>${escapeHtml(member.birthday || "")}</td>
+        <td>${member.lineUserId || member.lineBound ? "已綁定" : "未綁定"}</td>
+        <td>${escapeHtml(member.lineDisplayName || "")}</td>
+        <td>${Utils.displayDateTime(member.boundAt) || ""}</td>
+        <td>${Utils.displayDateTime(member.lastLoginAt) || ""}</td>
+      </tr>
+    `).join("");
+    downloadExcel("千禧獅子會-會員清單.xls", `
+      <table border="1">
+        <thead><tr><th>會員編號</th><th>姓名</th><th>手機</th><th>會員狀態</th><th>年度職位</th><th>生日</th><th>LINE綁定</th><th>LINE顯示名稱</th><th>綁定時間</th><th>最後登入</th></tr></thead>
+        <tbody>${rows || `<tr><td colspan="10">無資料</td></tr>`}</tbody>
+      </table>
+    `);
   }
 
   async function handleAction(button) {
@@ -553,6 +638,9 @@
       dashboardState = await Api.unbindMember(button.dataset.member);
       renderFromState();
     }
+    if (action === "member-attendance") {
+      renderMemberAttendance(button.dataset.member);
+    }
     if (action === "edit-event") {
       const event = data.events.find((item) => item.eventId === button.dataset.event);
       if (!event) return;
@@ -572,6 +660,19 @@
     }
     if (action === "export-event") {
       exportEventExcel(button.dataset.event);
+    }
+    if (action === "delete-event") {
+      const event = data.events.find((item) => item.eventId === button.dataset.event);
+      if (!event) return;
+      const regCount = data.registrations.filter((item) => item.eventId === event.eventId).length;
+      const attendanceCount = data.attendance.filter((item) => item.eventId === event.eventId).length;
+      const message = regCount || attendanceCount
+        ? `確定刪除「${event.name}」？\n此動作會一併刪除 ${regCount} 筆報名與 ${attendanceCount} 筆簽到紀錄。`
+        : `確定刪除「${event.name}」？`;
+      if (!confirm(message)) return;
+      dashboardState = await Api.deleteEvent(event.eventId, true);
+      $("eventIdInput").value = "";
+      renderFromState();
     }
     if (action === "cancel-checkin") {
       if (!confirm("確定取消這筆簽到？")) return;
@@ -604,6 +705,8 @@
     });
     $("saveMemberButton").addEventListener("click", () => saveMember());
     $("saveEventButton").addEventListener("click", () => saveEvent());
+    $("exportMembersButton").addEventListener("click", exportMembersExcel);
+    $("closeMemberAttendanceButton").addEventListener("click", () => $("memberAttendancePanel").classList.add("hidden"));
     $("memberSearch").addEventListener("input", renderMembers);
     $("registrationEventFilter").addEventListener("change", renderRegistrations);
     $("attendanceEventFilter").addEventListener("change", renderAttendance);

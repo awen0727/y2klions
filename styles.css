@@ -95,6 +95,8 @@ h2 { margin: 0 0 8px; color: var(--ink); letter-spacing: 0; }
   gap: 16px;
 }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.toolbar .search { flex: 1 1 240px; }
 .connection-status { margin: 7px 0 0; color: var(--muted); font-size: .92rem; }
 .connection-status strong { color: var(--navy); }
 .connection-status.ok strong { color: var(--success); }
@@ -306,8 +308,8 @@ th { color: var(--navy); background: #edf3f9; font-size: .86rem; }
   .brand-mark { width: 88px; height: 88px; border-radius: 18px; }
   .form-grid.two, .form-grid.three, .form-grid.four, .form-grid.five, .form-grid.six { grid-template-columns: 1fr; }
   .section-title, .member-card, .admin-bar { align-items: stretch; flex-direction: column; }
-  .actions { justify-content: stretch; }
-  .actions > * { flex: 1; }
+  .actions, .toolbar { justify-content: stretch; }
+  .actions > *, .toolbar > * { flex: 1; }
   .tabs, .admin-tabs { grid-template-columns: 1fr 1fr; }
   .stats-grid, .compare-grid { grid-template-columns: 1fr 1fr; }
   .display-hero, .display-grid { grid-template-columns: 1fr; }

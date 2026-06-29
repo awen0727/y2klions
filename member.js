@@ -81,6 +81,14 @@
       const attendance = findAttendance(event.eventId);
       const registered = registration && registration.status === "已報名";
       const canceled = registration && registration.status === "已取消";
+      const timing = Utils.eventTiming(event);
+      const canRegister = event.registrationOpen && timing.beforeStart;
+      const canCheckin = event.checkinOpen && timing.during;
+      const timingHint = timing.beforeStart
+        ? "活動開始前開放報名，活動期間開放簽到。"
+        : timing.during
+          ? "活動進行中，可進行簽到。"
+          : "活動已結束。";
       return `
         <article class="item">
           <div class="item-row">
@@ -96,11 +104,12 @@
             </span>
           </div>
           <p class="muted">${escapeHtml(event.notes || "")}</p>
+          <p class="hint">${escapeHtml(timingHint)}</p>
           ${registered ? `<p class="hint">同行人數：${Number(registration.companions || 0)}｜備註：${escapeHtml(registration.notes || "無")}</p>` : ""}
           <div class="button-row">
-            ${event.registrationOpen && !registered ? `<button data-action="register" data-event="${escapeHtml(event.eventId)}" type="button">我要報名</button>` : ""}
-            ${event.registrationOpen && registered ? `<button class="secondary" data-action="cancel-registration" data-event="${escapeHtml(event.eventId)}" type="button">取消報名</button>` : ""}
-            ${event.checkinOpen && !attendance ? `<button data-action="checkin" data-event="${escapeHtml(event.eventId)}" type="button">我要簽到</button>` : ""}
+            ${canRegister && !registered ? `<button data-action="register" data-event="${escapeHtml(event.eventId)}" type="button">我要報名</button>` : ""}
+            ${canRegister && registered ? `<button class="secondary" data-action="cancel-registration" data-event="${escapeHtml(event.eventId)}" type="button">取消報名</button>` : ""}
+            ${canCheckin && !attendance ? `<button data-action="checkin" data-event="${escapeHtml(event.eventId)}" type="button">我要簽到</button>` : ""}
             ${attendance ? `<span class="badge green">簽到時間 ${Utils.displayDateTime(attendance.checkedInAt)}</span>` : ""}
           </div>
         </article>

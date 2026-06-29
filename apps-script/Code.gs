@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-28-v1';
+const API_VERSION = 'y2k-2026-06-30-v2';
 
 function doGet() {
   return json_({
@@ -172,7 +172,8 @@ function registerEvent_(payload) {
 
 function cancelRegistration_(payload) {
   const member = requireMember_(payload.lineUserId);
-  const registration = rows_('EventRegistrations').find((row) => row['活動編號'] === payload.eventId && row['會員編號'] === member['會員編號'] && row['報名狀態'] === '已報名');
+  const event = requireOpenEvent_(payload.eventId, 'registration');
+  const registration = rows_('EventRegistrations').find((row) => row['活動編號'] === event['活動編號'] && row['會員編號'] === member['會員編號'] && row['報名狀態'] === '已報名');
   if (!registration) throw new Error('目前沒有有效報名可取消');
   updateByKey_('EventRegistrations', '報名編號', registration['報名編號'], {
     '報名狀態': '已取消',
@@ -384,7 +385,7 @@ function cancelCheckIn_(session, attendanceId) {
 
 function createCheckIn_(member, eventId, method, actor, notes) {
   if (!isUsableMemberStatus_(member['會員狀態'])) throw new Error('會員狀態不可簽到');
-  const event = requireOpenEvent_(eventId, 'checkin');
+  const event = requireOpenEvent_(eventId, method === 'LINE' ? 'checkin' : 'manualCheckin');
   const existing = rows_('Attendance').find((row) => row['活動編號'] === event['活動編號'] && row['會員編號'] === member['會員編號']);
   const now = nowIso_();
   if (existing) {
@@ -429,9 +430,57 @@ function isUsableMemberStatus_(status) {
 function requireOpenEvent_(eventId, mode) {
   const event = findRowByValue_('Events', '活動編號', required_(eventId, '缺少活動編號'));
   if (!event || event['活動狀態'] !== '開放') throw new Error('此活動未開放');
-  if (mode === 'registration' && event['是否開放報名'] !== '是') throw new Error('此活動未開放報名');
-  if (mode === 'checkin' && event['是否開放簽到'] !== '是') throw new Error('此活動未開放簽到');
+  if (mode === 'registration') {
+    if (event['是否開放報名'] !== '是') throw new Error('此活動未開放報名');
+    if (!isBeforeEventStart_(event)) throw new Error('活動開始後不可報名');
+  }
+  if (mode === 'checkin') {
+    if (event['是否開放簽到'] !== '是') throw new Error('此活動未開放簽到');
+    if (!isDuringEvent_(event)) throw new Error('簽到尚未開放或已結束');
+  }
   return event;
+}
+
+function isBeforeEventStart_(event) {
+  const start = eventDateTime_(event, 'start');
+  if (!start) throw new Error('活動日期格式不正確');
+  return new Date().getTime() < start.getTime();
+}
+
+function isDuringEvent_(event) {
+  const start = eventDateTime_(event, 'start');
+  const end = eventDateTime_(event, 'end');
+  if (!start || !end) throw new Error('活動日期格式不正確');
+  const now = new Date().getTime();
+  return now >= start.getTime() && now <= end.getTime();
+}
+
+function eventDateTime_(event, boundary) {
+  const dateParts = eventDateParts_(event['活動日期']);
+  if (!dateParts) return null;
+  const fallback = boundary === 'end' ? [23, 59] : [0, 0];
+  const timeParts = eventTimeParts_(boundary === 'end' ? event['結束時間'] : event['開始時間'], fallback);
+  return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], boundary === 'end' ? 59 : 0, 0);
+}
+
+function eventDateParts_(value) {
+  if (value instanceof Date) {
+    return [value.getFullYear(), value.getMonth() + 1, value.getDate()];
+  }
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) return [Number(match[1]), Number(match[2]), Number(match[3])];
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return [parsed.getFullYear(), parsed.getMonth() + 1, parsed.getDate()];
+}
+
+function eventTimeParts_(value, fallback) {
+  if (value instanceof Date) {
+    return [value.getHours(), value.getMinutes()];
+  }
+  const match = String(value || '').match(/(\d{1,2}):(\d{2})/);
+  if (match) return [Number(match[1]), Number(match[2])];
+  return fallback;
 }
 
 function requireAdmin_(token) {

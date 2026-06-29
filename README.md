@@ -35,6 +35,14 @@ apiUrl: "PASTE_APPS_SCRIPT_WEB_APP_URL_HERE"
 
 如果已建立 LINE LIFF，將 `liffId` 填入 `config.js`。尚未填 LIFF 時，可由入口網址帶入 `lineUserId`。
 
+目前正式 LIFF：
+
+```text
+LIFF URL: https://liff.line.me/2010549563-FKKbO0xy
+LIFF ID: 2010549563-FKKbO0xy
+Endpoint URL: https://awen0727.github.io/y2klions/
+```
+
 ## 不要放進 GitHub Pages
 
 ```text

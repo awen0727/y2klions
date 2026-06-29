@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#255653">
+  <meta name="theme-color" content="#163f73">
   <title>千禧管理後台</title>
-  <link rel="stylesheet" href="styles.css?v=20260629-visual2">
+  <link rel="icon" href="assets/y2k-logo.png?v=20260629-visual3">
+  <link rel="stylesheet" href="styles.css?v=20260629-visual3">
   <script src="config.js" defer></script>
   <script src="utils.js" defer></script>
   <script src="api.js" defer></script>
@@ -13,7 +14,7 @@
 </head>
 <body>
   <header class="app-header compact">
-    <div class="brand-mark logo-mark"><img src="assets/y2k-logo.png?v=20260629-visual2" alt="千禧獅子會"></div>
+    <div class="brand-mark logo-mark"><img src="assets/y2k-logo.png?v=20260629-visual3" alt="千禧獅子會"></div>
     <div>
       <p class="eyebrow">Admin Console</p>
       <h1>千禧管理後台</h1>
@@ -45,28 +46,28 @@
           <p id="apiStatus" class="connection-status"></p>
         </div>
         <div class="actions">
-          <a class="button secondary" href="index.html"><span class="icon">會</span>會員端</a>
-          <button id="apiHealthButton" class="secondary" type="button"><span class="icon">連</span>檢查連線</button>
-          <button id="changePasswordButton" class="secondary" type="button"><span class="icon">鑰</span>變更密碼</button>
-          <button id="logoutButton" type="button"><span class="icon">出</span>登出</button>
+          <a class="button secondary" href="index.html"><span class="icon">↗</span>會員端</a>
+          <button id="apiHealthButton" class="secondary" type="button"><span class="icon">✓</span>檢查連線</button>
+          <button id="changePasswordButton" class="secondary" type="button"><span class="icon">◇</span>變更密碼</button>
+          <button id="logoutButton" type="button"><span class="icon">→</span>登出</button>
         </div>
       </section>
 
       <section class="stats-grid">
-        <article><span><b class="icon">員</b>會員總數</span><strong id="statMembers">0</strong></article>
-        <article><span><b class="icon">綁</b>已綁定 LINE</span><strong id="statBound">0</strong></article>
-        <article><span><b class="icon">活</b>開放活動</span><strong id="statEvents">0</strong></article>
-        <article><span><b class="icon">報</b>有效報名</span><strong id="statRegs">0</strong></article>
-        <article><span><b class="icon">到</b>已簽到</span><strong id="statCheckins">0</strong></article>
+        <article><span><b class="icon">ID</b>會員總數</span><strong id="statMembers">0</strong></article>
+        <article><span><b class="icon">L</b>已綁定 LINE</span><strong id="statBound">0</strong></article>
+        <article><span><b class="icon">＋</b>開放活動</span><strong id="statEvents">0</strong></article>
+        <article><span><b class="icon">✓</b>有效報名</span><strong id="statRegs">0</strong></article>
+        <article><span><b class="icon">●</b>已簽到</span><strong id="statCheckins">0</strong></article>
       </section>
 
       <nav class="tabs admin-tabs">
-        <button class="tab active" data-tab="dashboard" type="button"><span class="icon">覽</span>總覽</button>
-        <button class="tab" data-tab="members" type="button"><span class="icon">員</span>會員管理</button>
-        <button class="tab" data-tab="events" type="button"><span class="icon">活</span>活動管理</button>
-        <button class="tab" data-tab="registrations" type="button"><span class="icon">報</span>報名管理</button>
-        <button class="tab" data-tab="attendance" type="button"><span class="icon">到</span>簽到管理</button>
-        <button class="tab" data-tab="logs" type="button"><span class="icon">錄</span>操作紀錄</button>
+        <button class="tab active" data-tab="dashboard" type="button"><span class="icon">⌂</span>總覽</button>
+        <button class="tab" data-tab="members" type="button"><span class="icon">ID</span>會員管理</button>
+        <button class="tab" data-tab="events" type="button"><span class="icon">＋</span>活動管理</button>
+        <button class="tab" data-tab="registrations" type="button"><span class="icon">✓</span>報名管理</button>
+        <button class="tab" data-tab="attendance" type="button"><span class="icon">●</span>簽到管理</button>
+        <button class="tab" data-tab="logs" type="button"><span class="icon">≡</span>操作紀錄</button>
       </nav>
 
       <section id="dashboardTab" class="tab-panel">
@@ -76,7 +77,7 @@
               <p class="eyebrow">Overview</p>
               <h2>目前活動總覽</h2>
             </div>
-            <button id="exportAllButton" class="secondary" type="button"><span class="icon">匯</span>匯出資料 JSON</button>
+            <button id="exportAllButton" class="secondary" type="button"><span class="icon">⇩</span>匯出資料 JSON</button>
           </div>
           <div id="dashboardList" class="list"></div>
         </section>
@@ -98,7 +99,7 @@
             </label>
             <label>生日<input id="memberBirthdayInput" placeholder="1965/01/01"></label>
           </div>
-          <button id="saveMemberButton" type="button"><span class="icon">存</span>儲存會員</button>
+          <button id="saveMemberButton" type="button"><span class="icon">✓</span>儲存會員</button>
         </section>
         <section class="panel">
           <div class="section-title">
@@ -131,7 +132,7 @@
             <label class="checkline"><input id="eventCheckinInput" type="checkbox" checked> 開放簽到</label>
           </div>
           <label>備註<textarea id="eventNotesInput" rows="3"></textarea></label>
-          <button id="saveEventButton" type="button"><span class="icon">存</span>儲存活動</button>
+          <button id="saveEventButton" type="button"><span class="icon">✓</span>儲存活動</button>
         </section>
         <section class="panel">
           <h2>活動清單</h2>
@@ -157,7 +158,7 @@
             <label>會員<select id="manualMemberSelect"></select></label>
             <label>備註<input id="manualNotesInput" placeholder="例如：現場確認出席"></label>
           </div>
-          <button id="manualCheckinButton" type="button"><span class="icon">到</span>後台補簽到</button>
+          <button id="manualCheckinButton" type="button"><span class="icon">●</span>後台補簽到</button>
         </section>
         <section class="panel">
           <div class="section-title">

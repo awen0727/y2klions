@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-30-v4';
+const API_VERSION = 'y2k-2026-06-30-v5';
 
 function doGet() {
   return json_({
@@ -670,7 +670,6 @@ function setCellByKey_(sheetName, key, keyValue, field, value) {
 }
 
 function normalizeCell_(value) {
-  if (value instanceof Date) return value.toISOString();
   return value;
 }
 

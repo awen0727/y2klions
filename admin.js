@@ -96,6 +96,26 @@
     return "red";
   }
 
+  function isUsableMember(member) {
+    return member.status === "有效" || member.status === "系統管理員";
+  }
+
+  function eventById(eventId) {
+    return db().events.find((event) => event.eventId === eventId);
+  }
+
+  function memberById(memberId) {
+    return db().members.find((member) => member.memberId === memberId);
+  }
+
+  function displayUrl(eventId) {
+    const token = (window.Y2kConfig && window.Y2kConfig.displayToken) || "y2k-display-2026";
+    const url = new URL("display.html", window.location.href);
+    url.searchParams.set("eventId", eventId);
+    url.searchParams.set("token", token);
+    return url.toString();
+  }
+
   function renderStats() {
     const data = db();
     const countedMembers = data.members.filter(isCountedMember);
@@ -155,6 +175,7 @@
               <div class="meta">
                 <span>${escapeHtml(member.memberId)}</span>
                 <span>${escapeHtml(member.phoneMasked || Utils.maskPhone(member.phone))}</span>
+                <span>${escapeHtml(member.annualRole || "未設定職位")}</span>
                 <span>${escapeHtml(member.birthday || "未填生日")}</span>
               </div>
             </div>
@@ -193,7 +214,11 @@
           <span>簽到：${event.checkinOpen ? "開放" : "關閉"}</span>
           <span>${escapeHtml(event.notes || "")}</span>
         </div>
-        <button class="secondary small" data-action="edit-event" data-event="${escapeHtml(event.eventId)}" type="button">編輯</button>
+        <div class="button-row">
+          <button class="secondary small" data-action="edit-event" data-event="${escapeHtml(event.eventId)}" type="button">編輯</button>
+          <button class="secondary small" data-action="open-display" data-event="${escapeHtml(event.eventId)}" type="button">即時看板</button>
+          <button class="secondary small" data-action="export-event" data-event="${escapeHtml(event.eventId)}" type="button">匯出 Excel</button>
+        </div>
       </article>
     `).join("") || `<p class="muted">尚未建立活動。</p>`;
     fillEventSelects();
@@ -202,14 +227,14 @@
   function fillEventSelects() {
     const data = db();
     const options = data.events.map((event) => `<option value="${escapeHtml(event.eventId)}">${escapeHtml(event.name)}</option>`).join("");
-    ["registrationEventFilter", "manualEventSelect", "attendanceEventFilter"].forEach((id) => {
+    ["registrationEventFilter", "manualEventSelect", "attendanceEventFilter", "reportEventFilter"].forEach((id) => {
       const select = $(id);
       const old = select.value;
       select.innerHTML = options;
       if (data.events.some((event) => event.eventId === old)) select.value = old;
     });
     $("manualMemberSelect").innerHTML = data.members
-      .filter((member) => member.status === "有效")
+      .filter(isUsableMember)
       .map((member) => `<option value="${escapeHtml(member.memberId)}">${escapeHtml(member.memberId)} ${escapeHtml(member.name)}</option>`)
       .join("");
   }
@@ -277,6 +302,77 @@
     `;
   }
 
+  function attendanceReportRows(eventId) {
+    const data = db();
+    const activeRegs = data.registrations.filter((item) => item.eventId === eventId && item.status === "已報名");
+    const activeAttendance = data.attendance.filter((item) => item.eventId === eventId && item.status === "已簽到");
+    const registrationByMember = new Map(activeRegs.map((item) => [item.memberId, item]));
+    const attendanceByMember = new Map(activeAttendance.map((item) => [item.memberId, item]));
+    const includedIds = new Set([...registrationByMember.keys(), ...attendanceByMember.keys()]);
+
+    return Array.from(includedIds).map((memberId) => {
+      const member = memberById(memberId) || {};
+      const registration = registrationByMember.get(memberId) || null;
+      const attendance = attendanceByMember.get(memberId) || null;
+      const registered = Boolean(registration);
+      const checked = Boolean(attendance);
+      return {
+        memberId,
+        name: member.name || registration?.name || attendance?.name || memberId,
+        phone: member.phone || "",
+        phoneMasked: member.phoneMasked || "",
+        annualRole: member.annualRole || "",
+        registered,
+        checked,
+        registration,
+        attendance,
+        statusKey: checked ? (registered ? "checked" : "walkin") : (registered ? "registered-unchecked" : "absent")
+      };
+    });
+  }
+
+  function renderReports() {
+    const data = db();
+    const eventId = $("reportEventFilter").value || (data.events[0] && data.events[0].eventId);
+    const status = $("reportStatusFilter").value || "all";
+    const keyword = ($("reportMemberSearch").value || "").trim().toLowerCase();
+    const rows = attendanceReportRows(eventId);
+    const filtered = rows.filter((row) => {
+      const statusOk = status === "all" || row.statusKey === status || (status === "absent" && !row.checked);
+      const searchText = `${row.memberId} ${row.name} ${row.phone} ${row.annualRole}`.toLowerCase();
+      return statusOk && (!keyword || searchText.includes(keyword));
+    });
+    const checked = rows.filter((row) => row.checked).length;
+    const registered = rows.filter((row) => row.registered).length;
+    const registeredUnchecked = rows.filter((row) => row.registered && !row.checked).length;
+    const walkin = rows.filter((row) => !row.registered && row.checked).length;
+
+    $("reportSummary").innerHTML = `
+      <article class="compare-card"><span>已報名</span><strong>${registered}</strong></article>
+      <article class="compare-card"><span>已簽到</span><strong>${checked}</strong></article>
+      <article class="compare-card"><span>已報名未簽到</span><strong>${registeredUnchecked}</strong></article>
+      <article class="compare-card"><span>未報名已簽到</span><strong>${walkin}</strong></article>
+    `;
+
+    $("reportList").innerHTML = `
+      <table>
+        <thead><tr><th>會員</th><th>年度職位</th><th>手機</th><th>報名</th><th>同行</th><th>簽到</th><th>簽到時間</th><th>方式</th></tr></thead>
+        <tbody>${filtered.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.memberId)} ${escapeHtml(row.name)}</td>
+            <td>${escapeHtml(row.annualRole || "")}</td>
+            <td>${escapeHtml(row.phoneMasked || Utils.maskPhone(row.phone))}</td>
+            <td>${row.registered ? "已報名" : "未報名"}</td>
+            <td>${Number(row.registration?.companions || 0)}</td>
+            <td>${row.checked ? "已簽到" : "未簽到"}</td>
+            <td>${Utils.displayDateTime(row.attendance?.checkedInAt) || ""}</td>
+            <td>${escapeHtml(row.attendance?.method || "")}</td>
+          </tr>
+        `).join("") || `<tr><td colspan="8">沒有符合的出席資料。</td></tr>`}</tbody>
+      </table>
+    `;
+  }
+
   function renderLogs() {
     const rows = db().auditLogs.slice(0, 80).map((log) => `
       <tr>
@@ -303,6 +399,7 @@
     renderEvents();
     renderRegistrations();
     renderAttendance();
+    renderReports();
     renderLogs();
   }
 
@@ -364,9 +461,10 @@
         name: $("memberNameInput").value.trim(),
         phone: $("memberPhoneInput").value.trim(),
         status: $("memberStatusInput").value,
-        birthday: $("memberBirthdayInput").value.trim()
+        birthday: $("memberBirthdayInput").value.trim(),
+        annualRole: $("memberAnnualRoleInput").value.trim()
       });
-      ["memberIdInput", "memberNameInput", "memberPhoneInput", "memberBirthdayInput"].forEach((id) => { $(id).value = ""; });
+      ["memberIdInput", "memberNameInput", "memberPhoneInput", "memberBirthdayInput", "memberAnnualRoleInput"].forEach((id) => { $(id).value = ""; });
       $("memberStatusInput").value = "有效";
       renderFromState();
     } catch (error) {
@@ -398,13 +496,41 @@
     }
   }
 
-  function exportAll() {
-    const content = JSON.stringify(db(), null, 2);
-    const blob = new Blob([content], { type: "application/json;charset=utf-8" });
+  function exportEventExcel(eventId) {
+    const event = eventById(eventId);
+    if (!event) return;
+    const rows = attendanceReportRows(eventId);
+    const tableRows = rows.map((row) => `
+      <tr>
+        <td>${escapeHtml(event.eventId)}</td>
+        <td>${escapeHtml(event.name)}</td>
+        <td>${escapeHtml(Utils.formatEventDate(event))}</td>
+        <td>${escapeHtml(row.memberId)}</td>
+        <td>${escapeHtml(row.name)}</td>
+        <td>${escapeHtml(row.annualRole || "")}</td>
+        <td>${escapeHtml(row.phone)}</td>
+        <td>${row.registered ? "已報名" : "未報名"}</td>
+        <td>${Number(row.registration?.companions || 0)}</td>
+        <td>${escapeHtml(row.registration?.notes || "")}</td>
+        <td>${row.checked ? "已簽到" : "未簽到"}</td>
+        <td>${Utils.displayDateTime(row.attendance?.checkedInAt) || ""}</td>
+        <td>${escapeHtml(row.attendance?.method || "")}</td>
+        <td>${escapeHtml(row.attendance?.notes || "")}</td>
+      </tr>
+    `).join("");
+    const content = `
+      <html><head><meta charset="utf-8"></head><body>
+        <table border="1">
+          <thead><tr><th>活動編號</th><th>活動名稱</th><th>活動時間</th><th>會員編號</th><th>姓名</th><th>年度職位</th><th>手機</th><th>報名狀態</th><th>同行</th><th>報名備註</th><th>簽到狀態</th><th>簽到時間</th><th>方式</th><th>簽到備註</th></tr></thead>
+          <tbody>${tableRows || `<tr><td colspan="14">無資料</td></tr>`}</tbody>
+        </table>
+      </body></html>
+    `;
+    const blob = new Blob(["\ufeff", content], { type: "application/vnd.ms-excel;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "y2k-admin-export.json";
+    link.download = `${event.eventId}-${event.name || "活動"}-出席報表.xls`.replace(/[\\/:*?"<>|]/g, "-");
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -420,6 +546,7 @@
       $("memberPhoneInput").value = member.phone || "";
       $("memberStatusInput").value = member.status;
       $("memberBirthdayInput").value = member.birthday || "";
+      $("memberAnnualRoleInput").value = member.annualRole || "";
     }
     if (action === "unbind-member") {
       if (!confirm("確定解除此會員 LINE 綁定？")) return;
@@ -439,6 +566,12 @@
       $("eventRegInput").checked = event.registrationOpen;
       $("eventCheckinInput").checked = event.checkinOpen;
       $("eventNotesInput").value = event.notes;
+    }
+    if (action === "open-display") {
+      window.open(displayUrl(button.dataset.event), "_blank", "noopener");
+    }
+    if (action === "export-event") {
+      exportEventExcel(button.dataset.event);
     }
     if (action === "cancel-checkin") {
       if (!confirm("確定取消這筆簽到？")) return;
@@ -471,10 +604,12 @@
     });
     $("saveMemberButton").addEventListener("click", () => saveMember());
     $("saveEventButton").addEventListener("click", () => saveEvent());
-    $("exportAllButton").addEventListener("click", exportAll);
     $("memberSearch").addEventListener("input", renderMembers);
     $("registrationEventFilter").addEventListener("change", renderRegistrations);
     $("attendanceEventFilter").addEventListener("change", renderAttendance);
+    $("reportEventFilter").addEventListener("change", renderReports);
+    $("reportStatusFilter").addEventListener("change", renderReports);
+    $("reportMemberSearch").addEventListener("input", renderReports);
     $("manualCheckinButton").addEventListener("click", async () => {
       try {
         dashboardState = await Api.manualCheckIn($("manualEventSelect").value, $("manualMemberSelect").value, $("manualNotesInput").value.trim());

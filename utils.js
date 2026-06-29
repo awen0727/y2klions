@@ -14,10 +14,35 @@
     });
   }
 
+  function twoDigits(value) {
+    return String(value).padStart(2, "0");
+  }
+
+  function formatDateOnly(value) {
+    if (!value) return "";
+    const text = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text.replaceAll("-", "/");
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return `${date.getFullYear()}/${twoDigits(date.getMonth() + 1)}/${twoDigits(date.getDate())}`;
+    }
+    const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+    if (match) return `${match[1]}/${twoDigits(match[2])}/${twoDigits(match[3])}`;
+    return text;
+  }
+
+  function formatTimeOnly(value) {
+    if (!value) return "";
+    const text = String(value);
+    const match = text.match(/T?(\d{1,2}):(\d{2})/);
+    if (match) return `${twoDigits(match[1])}:${match[2]}`;
+    return text;
+  }
+
   function formatEventDate(event) {
-    const date = event.date || "";
-    const start = event.startTime || "";
-    const end = event.endTime || "";
+    const date = formatDateOnly(event.date);
+    const start = formatTimeOnly(event.startTime);
+    const end = formatTimeOnly(event.endTime);
     if (!date) return "日期未定";
     if (start && end) return `${date} ${start}-${end}`;
     if (start) return `${date} ${start}`;
@@ -70,6 +95,8 @@
 
   window.Y2kUtils = {
     displayDateTime,
+    formatDateOnly,
+    formatTimeOnly,
     formatEventDate,
     eventTiming,
     maskPhone

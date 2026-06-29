@@ -138,6 +138,10 @@
     return post({ action: "health" });
   }
 
+  async function displayDashboard(eventId, token) {
+    return post({ action: "displayDashboard", eventId, token });
+  }
+
   async function saveMember(member) {
     await post({ action: "saveMember", sessionToken: getSessionToken(), member });
     return adminDashboard();
@@ -177,6 +181,7 @@
     adminDashboard,
     changeAdminPassword,
     health,
+    displayDashboard,
     saveMember,
     unbindMember,
     saveEvent,

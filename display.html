@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f73">
+  <title>千禧即時看板</title>
+  <link rel="icon" href="assets/y2k-logo.png?v=20260629-visual3">
+  <link rel="stylesheet" href="styles.css?v=20260630-display">
+  <script src="config.js?v=20260630-display" defer></script>
+  <script src="utils.js?v=20260630-display" defer></script>
+  <script src="api.js?v=20260630-display" defer></script>
+  <script src="display.js?v=20260630-display" defer></script>
+</head>
+<body class="display-page">
+  <main class="display-shell">
+    <section class="display-hero">
+      <div class="brand-mark logo-mark"><img src="assets/y2k-logo.png?v=20260629-visual3" alt="千禧獅子會"></div>
+      <div>
+        <p class="eyebrow">Live Dashboard</p>
+        <h1 id="displayEventName">千禧即時看板</h1>
+        <p id="displayEventMeta">資料讀取中...</p>
+      </div>
+      <div class="display-clock" id="displayClock"></div>
+    </section>
+
+    <section id="displayMessage" class="message hidden"></section>
+
+    <section class="display-stats">
+      <article><span>有效報名</span><strong id="displayRegistered">0</strong></article>
+      <article><span>同行人數</span><strong id="displayCompanions">0</strong></article>
+      <article><span>預估總人數</span><strong id="displayExpected">0</strong></article>
+      <article><span>已簽到</span><strong id="displayChecked">0</strong></article>
+    </section>
+
+    <section class="display-grid">
+      <article class="panel">
+        <h2>已簽到</h2>
+        <div id="displayAttendance" class="display-list"></div>
+      </article>
+      <article class="panel">
+        <h2>報名名單</h2>
+        <div id="displayRegistrations" class="display-list"></div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

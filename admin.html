@@ -6,11 +6,11 @@
   <meta name="theme-color" content="#163f73">
   <title>千禧管理後台</title>
   <link rel="icon" href="assets/y2k-logo.png?v=20260629-visual3">
-  <link rel="stylesheet" href="styles.css?v=20260629-visual3">
-  <script src="config.js?v=20260629-admin-member" defer></script>
-  <script src="utils.js?v=20260629-admin-member" defer></script>
-  <script src="api.js?v=20260629-admin-member" defer></script>
-  <script src="admin.js?v=20260629-admin-member" defer></script>
+  <link rel="stylesheet" href="styles.css?v=20260630-admin-report">
+  <script src="config.js?v=20260630-admin-report" defer></script>
+  <script src="utils.js?v=20260630-admin-report" defer></script>
+  <script src="api.js?v=20260630-admin-report" defer></script>
+  <script src="admin.js?v=20260630-admin-report" defer></script>
 </head>
 <body>
   <header class="app-header compact">
@@ -67,6 +67,7 @@
         <button class="tab" data-tab="events" type="button"><span class="icon">＋</span>活動管理</button>
         <button class="tab" data-tab="registrations" type="button"><span class="icon">✓</span>報名管理</button>
         <button class="tab" data-tab="attendance" type="button"><span class="icon">●</span>簽到管理</button>
+        <button class="tab" data-tab="reports" type="button"><span class="icon">◎</span>出席查詢</button>
         <button class="tab" data-tab="logs" type="button"><span class="icon">≡</span>操作紀錄</button>
       </nav>
 
@@ -77,7 +78,6 @@
               <p class="eyebrow">Overview</p>
               <h2>目前活動總覽</h2>
             </div>
-            <button id="exportAllButton" class="secondary" type="button"><span class="icon">⇩</span>匯出資料 JSON</button>
           </div>
           <div id="dashboardList" class="list"></div>
         </section>
@@ -86,7 +86,7 @@
       <section id="membersTab" class="tab-panel hidden">
         <section class="panel">
           <h2>新增 / 編輯會員</h2>
-          <div class="form-grid five">
+          <div class="form-grid six">
             <label>會員編號<input id="memberIdInput" placeholder="M005"></label>
             <label>姓名<input id="memberNameInput" placeholder="姓名"></label>
             <label>手機<input id="memberPhoneInput" placeholder="0912345678"></label>
@@ -99,6 +99,7 @@
               </select>
             </label>
             <label>生日<input id="memberBirthdayInput" placeholder="1965/01/01"></label>
+            <label>年度職位<input id="memberAnnualRoleInput" placeholder="例：會長、秘書、會員"></label>
           </div>
           <button id="saveMemberButton" type="button"><span class="icon">✓</span>儲存會員</button>
         </section>
@@ -168,6 +169,29 @@
           </div>
           <div id="attendanceCompare" class="compare-grid"></div>
           <div id="attendanceList" class="table-wrap"></div>
+        </section>
+      </section>
+
+      <section id="reportsTab" class="tab-panel hidden">
+        <section class="panel">
+          <div class="section-title">
+            <div><h2>出席查詢</h2><p class="muted">依活動、狀態、姓名或手機查詢出席狀況。</p></div>
+          </div>
+          <div class="form-grid three">
+            <label>活動<select id="reportEventFilter"></select></label>
+            <label>狀態
+              <select id="reportStatusFilter">
+                <option value="all">全部</option>
+                <option value="checked">已簽到</option>
+                <option value="registered-unchecked">已報名未簽到</option>
+                <option value="walkin">未報名已簽到</option>
+                <option value="absent">未簽到</option>
+              </select>
+            </label>
+            <label>搜尋<input id="reportMemberSearch" placeholder="姓名、手機、編號、職位"></label>
+          </div>
+          <div id="reportSummary" class="compare-grid"></div>
+          <div id="reportList" class="table-wrap"></div>
         </section>
       </section>
 

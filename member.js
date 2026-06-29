@@ -65,7 +65,7 @@
     const member = currentState.member;
     showMessage("", "");
     $("memberGreeting").textContent = `${member.name}，您好`;
-    $("memberMeta").textContent = `會員編號 ${member.memberId}｜${member.status}｜手機 ${member.phoneMasked || Utils.maskPhone(member.phone)}`;
+    $("memberMeta").textContent = `會員編號 ${member.memberId}｜${member.status}${member.annualRole ? `｜${member.annualRole}` : ""}｜手機 ${member.phoneMasked || Utils.maskPhone(member.phone)}`;
     renderEvents();
     renderRecords();
     renderProfile();
@@ -118,28 +118,39 @@
   }
 
   function renderRecords() {
-    const records = [];
+    const eventMap = new Map();
+    (currentState.events || []).forEach((event) => {
+      eventMap.set(event.eventId, { event, registration: null, attendance: null, time: event.date || "" });
+    });
     (currentState.registrations || []).forEach((item) => {
       const event = (currentState.events || []).find((eventItem) => eventItem.eventId === item.eventId);
-      records.push({
-        time: item.canceledAt || item.registeredAt,
-        title: `${event ? event.name : item.eventId}｜${item.status}`,
-        detail: `報名時間 ${Utils.displayDateTime(item.registeredAt)}${item.canceledAt ? `｜取消 ${Utils.displayDateTime(item.canceledAt)}` : ""}`
-      });
+      const record = eventMap.get(item.eventId) || { event, registration: null, attendance: null, time: "" };
+      record.registration = item;
+      record.time = item.canceledAt || item.registeredAt || record.time;
+      eventMap.set(item.eventId, record);
     });
     (currentState.attendance || []).forEach((item) => {
       const event = (currentState.events || []).find((eventItem) => eventItem.eventId === item.eventId);
-      records.push({
-        time: item.checkedInAt,
-        title: `${event ? event.name : item.eventId}｜${item.status}`,
-        detail: `簽到時間 ${Utils.displayDateTime(item.checkedInAt)}｜方式 ${item.method}`
-      });
+      const record = eventMap.get(item.eventId) || { event, registration: null, attendance: null, time: "" };
+      if (item.status === "已簽到") record.attendance = item;
+      record.time = item.checkedInAt || record.time;
+      eventMap.set(item.eventId, record);
     });
+    const records = Array.from(eventMap.values()).filter((record) => record.registration || record.attendance);
     records.sort((a, b) => String(b.time).localeCompare(String(a.time)));
     $("recordList").innerHTML = records.map((record) => `
       <article class="item">
-        <h3>${escapeHtml(record.title)}</h3>
-        <p class="muted">${escapeHtml(record.detail)}</p>
+        <div class="item-row">
+          <div>
+            <h3>${escapeHtml(record.event ? record.event.name : (record.registration || record.attendance).eventId)}</h3>
+            <p class="muted">${escapeHtml(record.event ? Utils.formatEventDate(record.event) : "")}</p>
+          </div>
+          <span class="badge ${record.attendance ? "green" : record.registration && record.registration.status === "已報名" ? "yellow" : ""}">
+            ${record.attendance ? "已簽到" : record.registration ? record.registration.status : "未簽到"}
+          </span>
+        </div>
+        ${record.registration ? `<p class="muted">報名：${escapeHtml(record.registration.status)}｜${Utils.displayDateTime(record.registration.registeredAt) || "未記錄"}${record.registration.canceledAt ? `｜取消 ${Utils.displayDateTime(record.registration.canceledAt)}` : ""}｜同行 ${Number(record.registration.companions || 0)}</p>` : `<p class="muted">報名：未報名</p>`}
+        ${record.attendance ? `<p class="muted">簽到：${Utils.displayDateTime(record.attendance.checkedInAt)}｜${escapeHtml(record.attendance.method || "")}</p>` : `<p class="muted">簽到：尚未簽到</p>`}
       </article>
     `).join("") || `<p class="muted">目前尚無紀錄。</p>`;
   }
@@ -151,6 +162,7 @@
       ["會員編號", member.memberId],
       ["手機", member.phoneMasked || Utils.maskPhone(member.phone)],
       ["會員狀態", member.status],
+      ["年度職位", member.annualRole || "未設定"],
       ["生日", member.birthday || "未填"],
       ["LINE 綁定", member.lineBound || member.lineUserId ? "已綁定" : "未綁定"],
       ["綁定時間", Utils.displayDateTime(member.boundAt) || "未綁定"]

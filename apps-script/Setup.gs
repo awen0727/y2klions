@@ -10,7 +10,8 @@ const Y2K_SHEET_SCHEMA = {
     '綁定時間',
     '最後登入時間',
     '建立時間',
-    '更新時間'
+    '更新時間',
+    '年度職位'
   ],
   AdminUsers: [
     '帳號',
@@ -130,6 +131,7 @@ function ensureY2kSystemAdminMember() {
     '手機': '0932368727',
     '會員狀態': '系統管理員',
     '生日': '',
+    '年度職位': '系統管理員',
     '更新時間': now
   };
   const existing = findRowByValue_('Members', '會員編號', member['會員編號']);
@@ -151,7 +153,8 @@ function ensureY2kSystemAdminMember() {
     '',
     '',
     now,
-    now
+    now,
+    member['年度職位']
   ]);
   audit_('setup', '建立系統管理員會員', '會員', member['會員編號'], member['姓名']);
   SpreadsheetApp.flush();
@@ -206,7 +209,7 @@ function importY2kMembersFromSheet() {
 function createMembersImportSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = getOrCreateSheet_(ss, 'MembersImport');
-  setupHeader_(sheet, ['會員編號', '姓名', '手機', '會員狀態', '生日']);
+  setupHeader_(sheet, ['會員編號', '姓名', '手機', '會員狀態', '生日', '年度職位']);
 }
 
 function createSetupGuideSheet_(ss) {
@@ -217,7 +220,7 @@ function createSetupGuideSheet_(ss) {
     ['1', '執行「千禧獅子會系統 > 建立正式資料庫」。'],
     ['2', '系統會預設建立 M000 王立文，會員狀態為「系統管理員」，不計入會員總數。'],
     ['3', '在 Apps Script 手動執行 createY2kAdminUser(username, password, name, role) 建立第一個後台登入帳號。'],
-    ['4', '執行「建立會員匯入表」，到 MembersImport 填入會員編號、姓名、手機、會員狀態、生日。'],
+    ['4', '執行「建立會員匯入表」，到 MembersImport 填入會員編號、姓名、手機、會員狀態、生日、年度職位。'],
     ['5', '執行「匯入會員資料」，系統會新增或更新 Members。'],
     ['6', '部署 Apps Script Web App，取得 URL 後填入前端 config.js。'],
     ['安全提醒', 'GitHub Pages 只能放前端，不能放會員資料、密碼、Token 或 Google Sheet ID。']
@@ -266,6 +269,7 @@ function seedProductionSettings_() {
     ['SESSION_HOURS', '8', '後台登入有效小時數', nowIso_()],
     ['MAX_LOGIN_FAILURES', '5', '後台登入失敗鎖定門檻', nowIso_()],
     ['LOCK_MINUTES', '15', '後台登入鎖定分鐘數', nowIso_()],
+    ['DISPLAY_TOKEN', 'y2k-display-2026', '即時看板讀取 token，正式使用可自行改成較長字串', nowIso_()],
     ['ENVIRONMENT', 'production', '資料庫用途', nowIso_()]
   ]);
 }
@@ -278,6 +282,7 @@ function upsertY2kMember_(item, now) {
     '手機': String(item['手機']).trim(),
     '會員狀態': String(item['會員狀態'] || '有效').trim(),
     '生日': item['生日'] || '',
+    '年度職位': String(item['年度職位'] || '').trim(),
     '更新時間': now
   };
   if (existing) {
@@ -296,7 +301,8 @@ function upsertY2kMember_(item, now) {
     '',
     '',
     now,
-    now
+    now,
+    payload['年度職位']
   ]);
   audit_('import', '匯入新增會員', '會員', memberId, payload['姓名']);
 }

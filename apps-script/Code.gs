@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-30-v2';
+const API_VERSION = 'y2k-2026-06-30-v3';
 
 function doGet() {
   return json_({
@@ -40,6 +40,8 @@ function route_(action, payload) {
       return cancelRegistration_(payload);
     case 'checkIn':
       return checkIn_(payload);
+    case 'displayDashboard':
+      return displayDashboard_(payload);
 
     case 'adminLogin':
       return adminLogin_(payload.username, payload.password);
@@ -127,12 +129,19 @@ function memberHome_(lineUserId) {
   const identity = memberIdentity_(lineUserId);
   if (!identity.bound) return identity;
   const memberId = identity.member.memberId;
+  const registrations = rows_('EventRegistrations').filter((row) => row['會員編號'] === memberId);
+  const attendance = rows_('Attendance').filter((row) => row['會員編號'] === memberId);
+  const relatedEventIds = {};
+  registrations.forEach((row) => { relatedEventIds[row['活動編號']] = true; });
+  attendance.forEach((row) => { relatedEventIds[row['活動編號']] = true; });
   return {
     bound: true,
     member: identity.member,
-    events: rows_('Events').filter((event) => event['活動狀態'] === '開放').map(publicEvent_),
-    registrations: rows_('EventRegistrations').filter((row) => row['會員編號'] === memberId).map(publicRegistration_),
-    attendance: rows_('Attendance').filter((row) => row['會員編號'] === memberId).map(publicAttendance_)
+    events: rows_('Events')
+      .filter((event) => event['活動狀態'] === '開放' || relatedEventIds[event['活動編號']])
+      .map(publicEvent_),
+    registrations: registrations.map(publicRegistration_),
+    attendance: attendance.map(publicAttendance_)
   };
 }
 
@@ -257,6 +266,42 @@ function adminDashboard_(session) {
   };
 }
 
+function displayDashboard_(payload) {
+  const token = required_(payload.token, '缺少看板 token');
+  if (token !== setting_('DISPLAY_TOKEN', 'y2k-display-2026')) throw new Error('看板 token 不正確');
+
+  const events = rows_('Events').map(publicEvent_);
+  const event = payload.eventId
+    ? events.find((item) => String(item.eventId) === String(payload.eventId))
+    : events.find((item) => item.status === '開放') || events[0];
+  if (!event) return { event: null, members: [], registrations: [], attendance: [], stats: {} };
+
+  const members = rows_('Members').map(adminMember_);
+  const registrations = rows_('EventRegistrations')
+    .filter((row) => row['活動編號'] === event.eventId)
+    .map(publicRegistration_);
+  const attendance = rows_('Attendance')
+    .filter((row) => row['活動編號'] === event.eventId)
+    .map(publicAttendance_);
+  const activeRegistrations = registrations.filter((item) => item.status === '已報名');
+  const activeAttendance = attendance.filter((item) => item.status === '已簽到');
+  const companionCount = activeRegistrations.reduce((sum, item) => sum + Number(item.companions || 0), 0);
+  const memberById = {};
+  members.forEach((member) => { memberById[member.memberId] = member; });
+
+  return {
+    event: event,
+    stats: {
+      registered: activeRegistrations.length,
+      companions: companionCount,
+      expected: activeRegistrations.length + companionCount,
+      checkedIn: activeAttendance.length
+    },
+    registrations: activeRegistrations.map((item) => Object.assign({}, item, { member: memberById[item.memberId] || null })),
+    attendance: activeAttendance.map((item) => Object.assign({}, item, { member: memberById[item.memberId] || null }))
+  };
+}
+
 function changeAdminPassword_(session, oldPassword, newPassword) {
   touchSession_(session.sessionId);
   oldPassword = required_(oldPassword, '缺少目前密碼');
@@ -280,6 +325,7 @@ function changeAdminPassword_(session, oldPassword, newPassword) {
 
 function saveMember_(session, member) {
   touchSession_(session.sessionId);
+  ensureSheetColumns_('Members', ['年度職位']);
   const memberId = required_(member.memberId, '缺少會員編號');
   const now = nowIso_();
   const existing = findRowByValue_('Members', '會員編號', memberId);
@@ -289,6 +335,7 @@ function saveMember_(session, member) {
       '手機': required_(member.phone, '缺少手機'),
       '會員狀態': member.status || '有效',
       '生日': member.birthday || '',
+      '年度職位': member.annualRole || '',
       '更新時間': now
     });
     audit_(session.name, '修改會員', '會員', memberId, member.name);
@@ -304,7 +351,8 @@ function saveMember_(session, member) {
       '',
       '',
       now,
-      now
+      now,
+      member.annualRole || ''
     ]);
     audit_(session.name, '新增會員', '會員', memberId, member.name);
   }
@@ -464,6 +512,9 @@ function eventDateTime_(event, boundary) {
 }
 
 function eventDateParts_(value) {
+  const normalized = publicDateValue_(value);
+  const normalizedMatch = String(normalized || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (normalizedMatch) return [Number(normalizedMatch[1]), Number(normalizedMatch[2]), Number(normalizedMatch[3])];
   if (value instanceof Date) {
     return [value.getFullYear(), value.getMonth() + 1, value.getDate()];
   }
@@ -475,6 +526,9 @@ function eventDateParts_(value) {
 }
 
 function eventTimeParts_(value, fallback) {
+  const normalized = publicTimeValue_(value);
+  const normalizedMatch = String(normalized || '').match(/^(\d{1,2}):(\d{2})$/);
+  if (normalizedMatch) return [Number(normalizedMatch[1]), Number(normalizedMatch[2])];
   if (value instanceof Date) {
     return [value.getHours(), value.getMinutes()];
   }
@@ -553,6 +607,20 @@ function updateByKey_(sheetName, key, keyValue, updates) {
   throw new Error('找不到資料：' + keyValue);
 }
 
+function ensureSheetColumns_(sheetName, columns) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) throw new Error('找不到工作表：' + sheetName);
+  const width = Math.max(sheet.getLastColumn(), 1);
+  const headers = sheet.getRange(1, 1, 1, width).getValues()[0];
+  let nextColumn = headers.length + 1;
+  columns.forEach((column) => {
+    if (headers.indexOf(column) !== -1) return;
+    sheet.getRange(1, nextColumn).setValue(column);
+    headers.push(column);
+    nextColumn += 1;
+  });
+}
+
 function setCellByKey_(sheetName, key, keyValue, field, value) {
   updateByKey_(sheetName, key, keyValue, Object.fromEntries([[field, value]]));
 }
@@ -571,6 +639,7 @@ function publicMember_(row) {
     name: row['姓名'],
     phoneMasked: maskPhone_(row['手機']),
     status: status,
+    annualRole: row['年度職位'] || (status === '系統管理員' ? '系統管理員' : ''),
     birthday: row['生日'],
     lineBound: Boolean(row['LINE User ID']),
     boundAt: row['綁定時間'] || '',
@@ -592,15 +661,37 @@ function publicEvent_(row) {
   return {
     eventId: row['活動編號'],
     name: row['活動名稱'],
-    date: row['活動日期'],
-    startTime: row['開始時間'],
-    endTime: row['結束時間'],
+    date: publicDateValue_(row['活動日期']),
+    startTime: publicTimeValue_(row['開始時間']),
+    endTime: publicTimeValue_(row['結束時間']),
     location: row['活動地點'],
     status: row['活動狀態'],
     registrationOpen: row['是否開放報名'] === '是',
     checkinOpen: row['是否開放簽到'] === '是',
     notes: row['備註']
   };
+}
+
+function publicDateValue_(value) {
+  if (!value) return '';
+  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const text = String(value);
+  const parsed = new Date(value);
+  if (text.indexOf('T') !== -1 && !Number.isNaN(parsed.getTime())) {
+    return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  const match = text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (!match) return text;
+  return match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2);
+}
+
+function publicTimeValue_(value) {
+  if (!value) return '';
+  if (value instanceof Date) return Utilities.formatDate(value, Session.getScriptTimeZone(), 'HH:mm');
+  const text = String(value);
+  const match = text.match(/T?(\d{1,2}):(\d{2})/);
+  if (!match) return text;
+  return ('0' + match[1]).slice(-2) + ':' + match[2];
 }
 
 function publicRegistration_(row) {

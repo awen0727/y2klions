@@ -107,7 +107,7 @@ function bindMember_(payload) {
   if (members.length > 1) throw new Error('此手機對應多位會員，請聯絡管理員協助綁定');
 
   const member = members[0];
-  if (member['會員狀態'] !== '有效') throw new Error('此會員狀態不是有效，請聯絡管理員');
+  if (!isUsableMemberStatus_(member['會員狀態'])) throw new Error('此會員狀態不可使用，請聯絡管理員');
   if (member['LINE User ID']) throw new Error('此會員已綁定其他 LINE 帳號');
 
   const now = nowIso_();
@@ -383,7 +383,7 @@ function cancelCheckIn_(session, attendanceId) {
 }
 
 function createCheckIn_(member, eventId, method, actor, notes) {
-  if (member['會員狀態'] !== '有效') throw new Error('會員狀態不可簽到');
+  if (!isUsableMemberStatus_(member['會員狀態'])) throw new Error('會員狀態不可簽到');
   const event = requireOpenEvent_(eventId, 'checkin');
   const existing = rows_('Attendance').find((row) => row['活動編號'] === event['活動編號'] && row['會員編號'] === member['會員編號']);
   const now = nowIso_();
@@ -418,8 +418,12 @@ function createCheckIn_(member, eventId, method, actor, notes) {
 function requireMember_(lineUserId) {
   const member = findRowByValue_('Members', 'LINE User ID', required_(lineUserId, '缺少 LINE User ID'));
   if (!member) throw new Error('尚未綁定會員');
-  if (member['會員狀態'] !== '有效') throw new Error('會員狀態不是有效');
+  if (!isUsableMemberStatus_(member['會員狀態'])) throw new Error('會員狀態不可使用');
   return member;
+}
+
+function isUsableMemberStatus_(status) {
+  return ['有效', '系統管理員'].indexOf(String(status || '')) !== -1;
 }
 
 function requireOpenEvent_(eventId, mode) {

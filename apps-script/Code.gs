@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-30-v5';
+const API_VERSION = 'y2k-2026-06-30-v6';
 
 function doGet() {
   return json_({
@@ -97,18 +97,19 @@ function memberIdentity_(lineUserId) {
 
 function bindMember_(payload) {
   const lineUserId = required_(payload.lineUserId, '缺少 LINE User ID');
-  const phone = required_(payload.phone, '缺少手機');
+  const phoneLast4 = String(required_(payload.phoneLast4 || payload.phone, '缺少手機末四碼')).replace(/\D/g, '');
   const lineDisplayName = payload.lineDisplayName || '';
+  if (phoneLast4.length !== 4) throw new Error('請輸入行動電話末四碼');
 
   const existingLine = findRowByValue_('Members', 'LINE User ID', lineUserId);
   if (existingLine) throw new Error('此 LINE 帳號已綁定其他會員');
 
-  const members = rows_('Members').filter((row) => String(row['手機']) === String(phone));
+  const members = rows_('Members').filter((row) => String(row['手機'] || '').replace(/\D/g, '').slice(-4) === phoneLast4);
   if (members.length === 0) {
-    appendRow_('BindingLogs', [makeId_('B'), lineUserId, phone, '', '失敗', '查無手機', nowIso_(), 'member']);
+    appendRow_('BindingLogs', [makeId_('B'), lineUserId, '末四碼:' + phoneLast4, '', '失敗', '查無手機末四碼', nowIso_(), 'member']);
     throw new Error('查無會員資料，請聯絡管理員');
   }
-  if (members.length > 1) throw new Error('此手機對應多位會員，請聯絡管理員協助綁定');
+  if (members.length > 1) throw new Error('此手機末四碼對應多位會員，請聯絡管理員協助綁定');
 
   const member = members[0];
   if (!isUsableMemberStatus_(member['會員狀態'])) throw new Error('此會員狀態不可使用，請聯絡管理員');
@@ -122,8 +123,8 @@ function bindMember_(payload) {
     '最後登入時間': now,
     '更新時間': now
   });
-  appendRow_('BindingLogs', [makeId_('B'), lineUserId, phone, member['會員編號'], '成功', '手機認證', now, 'member']);
-  audit_('member:' + member['姓名'], 'LINE 綁定', '會員', member['會員編號'], '手機認證後綁定');
+  appendRow_('BindingLogs', [makeId_('B'), lineUserId, '末四碼:' + phoneLast4, member['會員編號'], '成功', '手機末四碼認證', now, 'member']);
+  audit_('member:' + member['姓名'], 'LINE 綁定', '會員', member['會員編號'], '手機末四碼認證後綁定');
   return { member: publicMember_(findRowByValue_('Members', '會員編號', member['會員編號'])) };
 }
 

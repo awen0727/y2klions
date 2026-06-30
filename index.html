@@ -9,9 +9,9 @@
   <link rel="stylesheet" href="styles.css?v=20260630-report">
   <script src="config.js?v=20260630-api5" defer></script>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js" defer></script>
-  <script src="utils.js?v=20260630-report" defer></script>
-  <script src="api.js?v=20260630-report" defer></script>
-  <script src="member.js?v=20260630-report" defer></script>
+  <script src="utils.js?v=20260630-bind4" defer></script>
+  <script src="api.js?v=20260630-bind4" defer></script>
+  <script src="member.js?v=20260630-bind4" defer></script>
 </head>
 <body>
   <header class="app-header">
@@ -33,10 +33,10 @@
           <h2>第一次使用，請先綁定會員</h2>
         </div>
       </div>
-      <p class="muted">請輸入會員主檔中的手機號碼。系統確認後，會把目前 LINE 帳號綁定到會員資料。</p>
+      <p class="muted">請輸入會員主檔中行動電話的末四碼。系統確認後，會把目前 LINE 帳號綁定到會員資料。</p>
       <div class="form-grid two">
-        <label>手機號碼
-          <input id="phoneInput" type="tel" inputmode="numeric" placeholder="例如 0912345678">
+        <label>行動電話末四碼
+          <input id="phoneInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="one-time-code" placeholder="例如 8727">
         </label>
         <label>LINE 顯示名稱
           <input id="lineDisplayName">

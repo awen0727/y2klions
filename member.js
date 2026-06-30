@@ -58,7 +58,7 @@
     $("memberHome").classList.toggle("hidden", !currentState.bound);
 
     if (!currentState.bound) {
-      showMessage("此 LINE 帳號尚未綁定會員，請先用手機認證。", "");
+      showMessage("此 LINE 帳號尚未綁定會員，請先用行動電話末四碼認證。", "");
       return;
     }
 
@@ -174,7 +174,9 @@
     try {
       const identity = currentIdentity || await ensureIdentity();
       if (!identity || !identity.lineUserId) throw new Error("尚未取得 LINE 身分");
-      currentState = await Api.bindMember(identity.lineUserId, $("lineDisplayName").value.trim(), $("phoneInput").value.trim());
+      const phoneLast4 = $("phoneInput").value.replace(/\D/g, "");
+      if (phoneLast4.length !== 4) throw new Error("請輸入行動電話末四碼");
+      currentState = await Api.bindMember(identity.lineUserId, $("lineDisplayName").value.trim(), phoneLast4);
       showMessage(`已成功綁定 ${currentState.member.name}。`, "success");
       $("phoneInput").value = "";
       await renderMemberState();

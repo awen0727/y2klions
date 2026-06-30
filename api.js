@@ -85,8 +85,8 @@
     return post({ action: "memberHome", lineUserId });
   }
 
-  async function bindMember(lineUserId, displayName, phone) {
-    await post({ action: "bindMember", lineUserId, lineDisplayName: displayName, phone });
+  async function bindMember(lineUserId, displayName, phoneLast4) {
+    await post({ action: "bindMember", lineUserId, lineDisplayName: displayName, phoneLast4 });
     return memberHome(lineUserId);
   }
 

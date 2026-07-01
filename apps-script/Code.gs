@@ -1,4 +1,4 @@
-const API_VERSION = 'y2k-2026-06-30-v6';
+const API_VERSION = 'y2k-2026-07-01-v7';
 
 function doGet() {
   return json_({
@@ -273,10 +273,14 @@ function displayDashboard_(payload) {
   const token = required_(payload.token, '缺少看板 token');
   if (token !== setting_('DISPLAY_TOKEN', 'y2k-display-2026')) throw new Error('看板 token 不正確');
 
-  const events = rows_('Events').map(publicEvent_);
+  const events = rows_('Events')
+    .map(publicEvent_)
+    .sort((a, b) => publicEventSortValue_(b) - publicEventSortValue_(a));
   const event = payload.eventId
     ? events.find((item) => String(item.eventId) === String(payload.eventId))
-    : events.find((item) => item.status === '開放') || events[0];
+    : events.find((item) => item.status === '開放' && isDuringPublicCheckInWindow_(item)) ||
+      events.find((item) => item.status === '開放') ||
+      events[0];
   if (!event) return { event: null, members: [], registrations: [], attendance: [], stats: {} };
 
   const members = rows_('Members').map(adminMember_);
@@ -504,14 +508,16 @@ function isUsableMemberStatus_(status) {
 
 function requireOpenEvent_(eventId, mode) {
   const event = findRowByValue_('Events', '活動編號', required_(eventId, '缺少活動編號'));
-  if (!event || event['活動狀態'] !== '開放') throw new Error('此活動未開放');
+  if (!event) throw new Error('此活動未開放');
+  if (mode === 'manualCheckin') return event;
+  if (effectiveEventStatus_(event) !== '開放') throw new Error('此活動未開放');
   if (mode === 'registration') {
     if (event['是否開放報名'] !== '是') throw new Error('此活動未開放報名');
     if (!isBeforeEventStart_(event)) throw new Error('活動開始後不可報名');
   }
   if (mode === 'checkin') {
     if (event['是否開放簽到'] !== '是') throw new Error('此活動未開放簽到');
-    if (!isDuringEvent_(event)) throw new Error('簽到尚未開放或已結束');
+    if (!isDuringCheckInWindow_(event)) throw new Error('簽到尚未開放或已結束');
   }
   return event;
 }
@@ -522,12 +528,24 @@ function isBeforeEventStart_(event) {
   return new Date().getTime() < start.getTime();
 }
 
-function isDuringEvent_(event) {
+function isDuringCheckInWindow_(event) {
   const start = eventDateTime_(event, 'start');
   const end = eventDateTime_(event, 'end');
   if (!start || !end) throw new Error('活動日期格式不正確');
+  const checkInStart = new Date(start.getTime() - 2 * 60 * 60 * 1000);
   const now = new Date().getTime();
-  return now >= start.getTime() && now <= end.getTime();
+  return now >= checkInStart.getTime() && now <= end.getTime();
+}
+
+function isEventEnded_(event) {
+  const end = eventDateTime_(event, 'end');
+  if (!end) return false;
+  return new Date().getTime() > end.getTime();
+}
+
+function effectiveEventStatus_(event) {
+  if (String(event['活動狀態'] || '') !== '開放') return event['活動狀態'] || '關閉';
+  return isEventEnded_(event) ? '關閉' : '開放';
 }
 
 function eventDateTime_(event, boundary) {
@@ -709,11 +727,30 @@ function publicEvent_(row) {
     startTime: publicTimeValue_(row['開始時間']),
     endTime: publicTimeValue_(row['結束時間']),
     location: row['活動地點'],
-    status: row['活動狀態'],
+    status: effectiveEventStatus_(row),
     registrationOpen: row['是否開放報名'] === '是',
     checkinOpen: row['是否開放簽到'] === '是',
     notes: row['備註']
   };
+}
+
+function publicEventSortValue_(event) {
+  const dateParts = eventDateParts_(event.date);
+  if (!dateParts) return 0;
+  const timeParts = eventTimeParts_(event.startTime, [0, 0]);
+  return new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], 0, 0).getTime();
+}
+
+function isDuringPublicCheckInWindow_(event) {
+  const dateParts = eventDateParts_(event.date);
+  if (!dateParts) return false;
+  const startParts = eventTimeParts_(event.startTime, [0, 0]);
+  const endParts = eventTimeParts_(event.endTime, [23, 59]);
+  const start = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], startParts[0], startParts[1], 0, 0);
+  const end = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], endParts[0], endParts[1], 59, 0);
+  const checkInStart = new Date(start.getTime() - 2 * 60 * 60 * 1000);
+  const now = new Date().getTime();
+  return now >= checkInStart.getTime() && now <= end.getTime();
 }
 
 function publicDateValue_(value) {

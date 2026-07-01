@@ -100,6 +100,10 @@
     return member.status === "有效" || member.status === "系統管理員";
   }
 
+  function sortedEvents() {
+    return [...db().events].sort((a, b) => Utils.eventSortValue(b) - Utils.eventSortValue(a));
+  }
+
   function eventById(eventId) {
     return db().events.find((event) => event.eventId === eventId);
   }
@@ -139,7 +143,7 @@
 
   function renderDashboard() {
     const data = db();
-    $("dashboardList").innerHTML = data.events.map((event) => {
+    $("dashboardList").innerHTML = sortedEvents().map((event) => {
       const reg = registrationStats(data, event.eventId);
       const checkins = attendanceStats(data, event.eventId);
       return `
@@ -207,8 +211,7 @@
   }
 
   function renderEvents() {
-    const data = db();
-    $("eventAdminList").innerHTML = data.events.map((event) => `
+    $("eventAdminList").innerHTML = sortedEvents().map((event) => `
       <article class="item">
         <div class="item-row">
           <div>
@@ -239,12 +242,13 @@
 
   function fillEventSelects() {
     const data = db();
-    const options = data.events.map((event) => `<option value="${escapeHtml(event.eventId)}">${escapeHtml(event.name)}</option>`).join("");
+    const events = sortedEvents();
+    const options = events.map((event) => `<option value="${escapeHtml(event.eventId)}">${escapeHtml(event.name)}</option>`).join("");
     ["registrationEventFilter", "manualEventSelect", "attendanceEventFilter", "reportEventFilter"].forEach((id) => {
       const select = $(id);
       const old = select.value;
       select.innerHTML = options;
-      if (data.events.some((event) => event.eventId === old)) select.value = old;
+      if (events.some((event) => event.eventId === old)) select.value = old;
     });
     $("manualMemberSelect").innerHTML = data.members
       .filter(isUsableMember)
@@ -254,7 +258,7 @@
 
   function renderRegistrations() {
     const data = db();
-    const eventId = $("registrationEventFilter").value || (data.events[0] && data.events[0].eventId);
+    const eventId = $("registrationEventFilter").value || (sortedEvents()[0] && sortedEvents()[0].eventId);
     const rows = data.registrations
       .filter((item) => item.eventId === eventId)
       .map((item) => {
@@ -281,7 +285,7 @@
 
   function renderAttendance() {
     const data = db();
-    const eventId = $("attendanceEventFilter").value || (data.events[0] && data.events[0].eventId);
+    const eventId = $("attendanceEventFilter").value || (sortedEvents()[0] && sortedEvents()[0].eventId);
     const activeRegs = data.registrations.filter((item) => item.eventId === eventId && item.status === "已報名");
     const activeAttendance = data.attendance.filter((item) => item.eventId === eventId && item.status === "已簽到");
     const attendedIds = new Set(activeAttendance.map((item) => item.memberId));
@@ -404,7 +408,7 @@
 
   function renderReports() {
     const data = db();
-    const eventId = $("reportEventFilter").value || (data.events[0] && data.events[0].eventId);
+    const eventId = $("reportEventFilter").value || (sortedEvents()[0] && sortedEvents()[0].eventId);
     const status = $("reportStatusFilter").value || "all";
     const keyword = ($("reportMemberSearch").value || "").trim().toLowerCase();
     const rows = attendanceReportRows(eventId);

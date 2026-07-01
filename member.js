@@ -74,7 +74,7 @@
   function renderEvents() {
     const events = (currentState.events || [])
       .filter((event) => event.status === "開放")
-      .sort((a, b) => String(a.date || "").localeCompare(String(b.date || "")));
+      .sort((a, b) => Utils.eventSortValue(b) - Utils.eventSortValue(a));
 
     $("eventList").innerHTML = events.map((event) => {
       const registration = findRegistration(event.eventId);
@@ -85,7 +85,7 @@
       const canRegister = event.registrationOpen && timing.beforeStart;
       const canCheckin = event.checkinOpen && timing.during;
       const timingHint = timing.beforeStart
-        ? "活動開始前開放報名，活動期間開放簽到。"
+        ? "活動開始前開放報名，簽到於活動前 2 小時開放。"
         : timing.during
           ? "活動進行中，可進行簽到。"
           : "活動已結束。";
@@ -137,7 +137,10 @@
       eventMap.set(item.eventId, record);
     });
     const records = Array.from(eventMap.values()).filter((record) => record.registration || record.attendance);
-    records.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+    records.sort((a, b) => {
+      const eventDiff = Utils.eventSortValue(b.event || {}) - Utils.eventSortValue(a.event || {});
+      return eventDiff || String(b.time).localeCompare(String(a.time));
+    });
     $("recordList").innerHTML = records.map((record) => `
       <article class="item">
         <div class="item-row">

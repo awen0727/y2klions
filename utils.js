@@ -73,15 +73,23 @@
     return new Date(date[0], date[1], date[2], time[0], time[1], boundary === "end" ? 59 : 0, 0);
   }
 
+  function eventSortValue(event) {
+    const start = eventDateTime(event, "start");
+    return start ? start.getTime() : 0;
+  }
+
   function eventTiming(event, nowValue) {
     const now = nowValue ? new Date(nowValue) : new Date();
     const start = eventDateTime(event, "start");
     const end = eventDateTime(event, "end");
     if (!start || !end) return { beforeStart: false, during: false, afterEnd: false };
+    const checkinStart = new Date(start.getTime() - 2 * 60 * 60 * 1000);
     return {
       beforeStart: now.getTime() < start.getTime(),
-      during: now.getTime() >= start.getTime() && now.getTime() <= end.getTime(),
+      beforeCheckin: now.getTime() < checkinStart.getTime(),
+      during: now.getTime() >= checkinStart.getTime() && now.getTime() <= end.getTime(),
       afterEnd: now.getTime() > end.getTime(),
+      checkinStart,
       start,
       end
     };
@@ -98,6 +106,7 @@
     formatDateOnly,
     formatTimeOnly,
     formatEventDate,
+    eventSortValue,
     eventTiming,
     maskPhone
   };
